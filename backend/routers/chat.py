@@ -17,17 +17,25 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 async def chat(req: ChatRequest):
-    messages = [{"role": "system", "content": req.system_prompt}] + req.history + [{"role": "user", "content": req.message}]
-    
     def generate():
-        stream = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            stream=True
-        )
-        for chunk in stream:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield delta
+        try:
+            messages = [{"role": "system", "content": req.system_prompt}] + req.history + [{"role": "user", "content": req.message}]
+            stream = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                stream=True
+            )
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+        except Exception as e:
+            error = str(e)
+            if "429" in error or "rate_limit" in error.lower():
+                yield "⚠️ Rate limit reached. Please wait a moment and try again."
+            elif "503" in error or "capacity" in error.lower():
+                yield "⚠️ AI server is busy. Please try again in a few seconds."
+            else:
+                yield f"❌ Error: {error}"
 
     return StreamingResponse(generate(), media_type="text/plain")
