@@ -132,6 +132,10 @@ function App() {
   const [systemPrompt, setSystemPrompt] = useState("You are VisionSync AI, a helpful multimodal AI assistant.");
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const [tempSystemPrompt, setTempSystemPrompt] = useState(systemPrompt);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraTarget, setCameraTarget] = useState<"ocr" | "vision" | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
   const saved = localStorage.getItem("visionsync-sessions");
     return saved ? JSON.parse(saved) : [];
@@ -171,6 +175,74 @@ function App() {
     recognition.start();
   };
 
+  const openCamera = (target: "ocr" | "vision") => {
+  setCameraTarget(target);
+  setShowCamera(true);
+  setTimeout(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch {
+      alert("Camera access denied. Please allow camera permission.");
+      setShowCamera(false);
+    }
+  }, 100);
+};
+
+const capturePhoto = () => {
+  if (!videoRef.current || !canvasRef.current) return;
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d")?.drawImage(video, 0, 0);
+  
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+    const file = new File([blob], "camera-capture.jpg", { type: "image/jpeg" });
+    
+    // Stop camera
+    const stream = video.srcObject as MediaStream;
+    stream?.getTracks().forEach(track => track.stop());
+    setShowCamera(false);
+
+    if (cameraTarget === "ocr") {
+      setOcrImage(URL.createObjectURL(blob));
+      setOcrResult(""); setOcrLoading(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const res = await fetch("https://visionsync-backend.onrender.com/api/ocr", { method: "POST", body: formData });
+        const data = await res.json();
+        setOcrResult(data.text);
+      } catch { setOcrResult("❌ Error: OCR failed."); }
+      finally { setOcrLoading(false); setActiveTab("ocr"); }
+    } else if (cameraTarget === "vision") {
+      setVisionImage(URL.createObjectURL(blob));
+      setVisionContentType("image/jpeg");
+      setVisionMessages([]);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const b64 = (reader.result as string).split(",")[1];
+        setVisionImageB64(b64);
+      };
+      reader.readAsDataURL(file);
+      setActiveTab("vision");
+    }
+  }, "image/jpeg", 0.9);
+};
+
+const closeCamera = () => {
+  if (videoRef.current) {
+    const stream = videoRef.current.srcObject as MediaStream;
+    stream?.getTracks().forEach(track => track.stop());
+  }
+  setShowCamera(false);
+};
+
   const handleOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -179,7 +251,7 @@ function App() {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const res = await fetch("http://localhost:8000/api/ocr", { method: "POST", body: formData });
+      const res = await fetch("https://visionsync-backend.onrender.com/api/ocr", { method: "POST", body: formData });
       const data = await res.json();
       setOcrResult(data.text);
     } catch { setOcrResult("❌ Error: OCR failed."); }
@@ -190,7 +262,7 @@ function App() {
     if (!summaryText.trim()) return;
     setSummaryResult(""); setSummaryLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/summarize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: summaryText, length: summaryLength }) });
+      const res = await fetch("https://visionsync-backend.onrender.com/api/summarize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: summaryText, length: summaryLength }) });
       const data = await res.json();
       setSummaryResult(data.summary);
     } catch { setSummaryResult("❌ Error: Summarizer failed."); }
@@ -201,7 +273,7 @@ function App() {
     if (!translateText.trim()) return;
     setTranslateResult(""); setTranslateLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: translateText, target_language: targetLanguage }) });
+      const res = await fetch("https://visionsync-backend.onrender.com/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: translateText, target_language: targetLanguage }) });
       const data = await res.json();
       setTranslateResult(data.translated);
     } catch { setTranslateResult("❌ Error: Translation failed."); }
@@ -216,7 +288,7 @@ function App() {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const res = await fetch("http://localhost:8000/api/detect", { method: "POST", body: formData });
+      const res = await fetch("https://visionsync-backend.onrender.com/api/detect", { method: "POST", body: formData });
       const data = await res.json();
       setDetectResult(data.detections);
       setDetectAnnotated(data.annotated_image);
@@ -232,7 +304,7 @@ function App() {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const res = await fetch("http://localhost:8000/api/pdf-upload", { method: "POST", body: formData });
+      const res = await fetch("https://visionsync-backend.onrender.com/api/pdf-upload", { method: "POST", body: formData });
       const data = await res.json();
       setPdfText(data.text);
       setPdfPages(data.pages);
@@ -247,7 +319,7 @@ function App() {
     const currentInput = pdfInput;
     setPdfInput(""); setPdfLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/pdf-chat", {
+      const res = await fetch("https://visionsync-backend.onrender.com/api/pdf-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: currentInput, pdf_text: pdfText }),
@@ -291,7 +363,7 @@ const handleVisionChat = async () => {
   const currentInput = visionInput;
   setVisionInput(""); setVisionLoading(true);
   try {
-    const res = await fetch("http://localhost:8000/api/vision-chat", {
+    const res = await fetch("https://visionsync-backend.onrender.com/api/vision-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: currentInput, image_base64: visionImageB64, content_type: visionContentType }),
@@ -321,7 +393,7 @@ const handleVisionChat = async () => {
     const currentInput = input;
     setInput(""); setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/chat", {
+      const res = await fetch("https://visionsync-backend.onrender.com/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: currentInput, history: messages.map((m) => ({ role: m.role, content: m.content })), system_prompt: systemPrompt }),
@@ -429,6 +501,24 @@ const saveCurrentSession = () => {
     </div>
   </div>
 )}
+
+{showCamera && (
+  <div className="fixed inset-0 bg-black z-50 flex flex-col">
+    <div className="flex items-center justify-between p-4">
+      <span className="text-white font-medium">📸 Camera</span>
+      <button onClick={closeCamera} className="text-white text-2xl">✕</button>
+    </div>
+    <video ref={videoRef} className="flex-1 object-cover w-full" autoPlay playsInline muted />
+    <canvas ref={canvasRef} className="hidden" />
+    <div className="p-6 flex justify-center">
+      <button
+        onClick={capturePhoto}
+        className="w-16 h-16 bg-white rounded-full border-4 border-gray-300 hover:bg-gray-100 transition-colors"
+      />
+    </div>
+  </div>
+)}
+
       <div className={`w-64 flex-shrink-0 flex flex-col p-4 ${isDark ? "bg-gray-900 border-r border-gray-800" : "bg-white border-r border-gray-200"}`}>
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm font-bold">V</div>
@@ -584,6 +674,12 @@ const saveCurrentSession = () => {
             <div className="w-full max-w-2xl">
               <h2 className="text-xl font-semibold mb-2">📷 OCR Scanner</h2>
               <p className="text-gray-500 text-sm mb-6">Upload an image to extract text using AI Vision</p>
+              <button
+                onClick={() => openCamera("ocr")}
+                className="mt-3 w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-2xl py-4 text-gray-400 text-sm transition-colors"
+              >
+                📸 Use Camera
+              </button>
               <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:border-violet-500 transition-colors bg-gray-900">
                 <div className="text-4xl mb-2">📁</div>
                 <p className="text-gray-400 text-sm">Click to upload image</p>
@@ -686,6 +782,12 @@ const saveCurrentSession = () => {
         <div className="w-full max-w-2xl">
           <h2 className="text-xl font-semibold mb-2">🖼️ Vision Chat</h2>
           <p className="text-gray-500 text-sm mb-6">Upload an image and ask AI anything about it</p>
+          <button
+            onClick={() => openCamera("vision")}
+            className="mt-3 w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-2xl py-4 text-gray-400 text-sm transition-colors"
+          >
+            📸 Use Camera
+          </button>
           <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:border-violet-500 transition-colors bg-gray-900">
             <div className="text-4xl mb-2">🖼️</div>
             <p className="text-gray-400 text-sm">Click to upload image</p>
