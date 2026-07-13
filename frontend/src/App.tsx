@@ -23,7 +23,7 @@ const LANGUAGES = [
 
 function renderMarkdown(text: string) {
   let html = text;
-  html = html.replace(/\*\*(.+?)\*\*/gs, '<strong style="font-weight:700;color:white">$1</strong>');
+  html = html.replace(/\*\*(.+?)\*\*/gs, '<strong style="font-weight:700">$1</strong>');
   html = html.replace(/\*(.+?)\*/gs, '<em>$1</em>');
   html = html.replace(/^### (.+)$/gm, '<h3 style="font-size:1rem;font-weight:700;margin:12px 0 4px">$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:1.1rem;font-weight:700;margin:12px 0 4px">$1</h2>');
@@ -34,9 +34,23 @@ function renderMarkdown(text: string) {
 }
 
 function MessageContent({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+  
+  const copyAll = () => {
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const parts = content.split(/(```[\s\S]*?```)/g);
   return (
-    <div>
+    <div className="relative group">
+      <button
+        onClick={copyAll}
+        className="absolute -top-2 -right-2 hidden group-hover:flex items-center gap-1 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 px-2 py-1 rounded-lg transition-colors z-10"
+      >
+        {copied ? "✅ Copied!" : "📋 Copy"}
+      </button>
       {parts.map((part, i) => {
         if (part.startsWith("```")) {
           const match = part.match(/```(\w+)?\n?([\s\S]*?)```/);
@@ -46,14 +60,25 @@ function MessageContent({ content }: { content: string }) {
             <div key={i} className="relative my-2">
               <div className="flex items-center justify-between bg-gray-800 px-3 py-1 rounded-t-lg">
                 <span className="text-xs text-gray-400">{lang}</span>
-                <button onClick={() => navigator.clipboard.writeText(code)} className="text-xs text-gray-400 hover:text-white transition-colors">📋 Copy</button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(code).then(() => {
+                      (e.target as HTMLButtonElement).textContent = "✅ Copied!";
+                      setTimeout(() => { (e.target as HTMLButtonElement).textContent = "📋 Copy"; }, 2000);
+                    });
+                  }}
+                  className="text-xs text-gray-400 hover:text-white transition-colors"
+                >
+                  📋 Copy
+                </button>
               </div>
               <SyntaxHighlighter language={lang} style={oneDark} customStyle={{ margin: 0, borderRadius: "0 0 8px 8px", fontSize: "13px" }}>{code}</SyntaxHighlighter>
             </div>
           );
         }
         let html = part;
-        html = html.replace(/\*\*(.+?)\*\*/gs, '<strong style="font-weight:700;color:white">$1</strong>');
+        html = html.replace(/\*\*(.+?)\*\*/gs, '<strong style="font-weight:700">$1</strong>');
         html = html.replace(/\*(.+?)\*/gs, '<em>$1</em>');
         html = html.replace(/^### (.+)$/gm, '<h3 style="font-size:1rem;font-weight:700;margin:12px 0 4px">$1</h3>');
         html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:1.1rem;font-weight:700;margin:12px 0 4px">$1</h2>');
@@ -103,6 +128,10 @@ function App() {
   const [pdfUploading, setPdfUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pdfBottomRef = useRef<HTMLDivElement>(null);
+  const [isDark, setIsDark] = useState(true);
+  const [systemPrompt, setSystemPrompt] = useState("You are VisionSync AI, a helpful multimodal AI assistant.");
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+  const [tempSystemPrompt, setTempSystemPrompt] = useState(systemPrompt);
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
   const saved = localStorage.getItem("visionsync-sessions");
     return saved ? JSON.parse(saved) : [];
@@ -295,7 +324,7 @@ const handleVisionChat = async () => {
       const res = await fetch("http://localhost:8000/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: currentInput, history: messages.map((m) => ({ role: m.role, content: m.content })) }),
+        body: JSON.stringify({ message: currentInput, history: messages.map((m) => ({ role: m.role, content: m.content })), system_prompt: systemPrompt }),
       });
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
@@ -359,8 +388,48 @@ const saveCurrentSession = () => {
   const handlePDFKey = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePDFChat(); } };
 
   return (
-    <div className="flex h-screen bg-gray-950 text-white">
-      <div className="w-64 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col p-4">
+    <div className={`flex h-screen ${isDark ? "bg-gray-950 text-white" : "bg-gray-50 text-gray-900"}`}>
+      {showSystemPrompt && (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-lg mx-4">
+      <h2 className="text-lg font-semibold mb-2">⚙️ System Prompt</h2>
+      <p className="text-xs text-gray-500 mb-4">AI ka behavior customize karo</p>
+      <textarea
+        value={tempSystemPrompt}
+        onChange={(e) => setTempSystemPrompt(e.target.value)}
+        rows={6}
+        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 text-gray-200"
+      />
+      <div className="flex gap-3 mt-4">
+        <button
+          onClick={() => { setSystemPrompt(tempSystemPrompt); setShowSystemPrompt(false); setMessages([]); }}
+          className="flex-1 bg-violet-600 hover:bg-violet-500 py-2 rounded-lg text-sm transition-colors"
+        >
+          ✅ Save & Reset Chat
+        </button>
+        <button
+          onClick={() => setShowSystemPrompt(false)}
+          className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-gray-400 transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {[
+          { label: "🤖 Default", prompt: "You are VisionSync AI, a helpful multimodal AI assistant." },
+          { label: "👨‍💻 Coder", prompt: "You are an expert programmer. Always provide clean, well-commented code with explanations." },
+          { label: "🎓 Teacher", prompt: "You are a patient teacher. Explain concepts step by step in simple language." },
+          { label: "✍️ Writer", prompt: "You are a creative writer. Help with writing, editing, and storytelling." },
+        ].map((p) => (
+          <button key={p.label} onClick={() => setTempSystemPrompt(p.prompt)} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 transition-colors">
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+      <div className={`w-64 flex-shrink-0 flex flex-col p-4 ${isDark ? "bg-gray-900 border-r border-gray-800" : "bg-white border-r border-gray-200"}`}>
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm font-bold">V</div>
           <span className="font-bold text-lg">VisionSync AI</span>
@@ -399,7 +468,7 @@ const saveCurrentSession = () => {
       </div>
 
       <div className="flex-1 flex flex-col">
-        <div className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+        <div className={`border-b px-6 py-4 flex items-center justify-between ${isDark ? "border-gray-800" : "border-gray-200 bg-white"}`}>
           <div>
             <h1 className="font-semibold text-lg">
               {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : "Object Detection"}
@@ -407,17 +476,29 @@ const saveCurrentSession = () => {
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
           <div className="flex items-center gap-3">
-  <button
-    onClick={() => { setIsTemporary(!isTemporary); setMessages([]); setCurrentSessionId(""); }}
-    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${isTemporary ? "bg-yellow-600/20 text-yellow-400 border border-yellow-600/30" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}
-  >
-    ⚡ {isTemporary ? "Temporary ON" : "Temporary"}
-  </button>
-  <div className="flex items-center gap-2">
-    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-    <span className="text-xs text-gray-400">Online</span>
-  </div>
-</div>
+            <button
+              onClick={() => { setIsTemporary(!isTemporary); setMessages([]); setCurrentSessionId(""); }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${isTemporary ? "bg-yellow-600/20 text-yellow-400 border border-yellow-600/30" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}
+            >
+              ⚡ {isTemporary ? "Temporary ON" : "Temporary"}
+            </button>
+            <button
+              onClick={() => setIsDark(!isDark)}
+              className="px-3 py-1.5 rounded-lg text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
+            >
+              {isDark ? "☀️ Light Mode" : "🌙 Dark Mode"}
+            </button>
+            <button
+              onClick={() => { setTempSystemPrompt(systemPrompt); setShowSystemPrompt(true); }}
+              className="px-3 py-1.5 rounded-lg text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
+            >
+              ⚙️ System
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-gray-400">Online</span>
+            </div>
+          </div>
         </div>
 
         {activeTab === "pdf" ? (
@@ -486,7 +567,7 @@ const saveCurrentSession = () => {
                   )}
                   <div ref={pdfBottomRef} />
                 </div>
-                <div className="border-t border-gray-800 px-6 py-4">
+                <div className={`border-t px-6 py-4 ${isDark ? "border-gray-800" : "border-gray-200 bg-white"}`}>
                   <div className="flex gap-3 items-end">
                     <textarea value={pdfInput} onChange={(e) => setPdfInput(e.target.value)} onKeyDown={handlePDFKey} placeholder="Ask about your PDF..." rows={1} className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors placeholder-gray-600" />
                     <button onClick={handlePDFChat} disabled={pdfLoading || !pdfInput.trim()} className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-3 rounded-xl transition-colors">
@@ -655,7 +736,7 @@ const saveCurrentSession = () => {
         </div>
         <div className="border-t border-gray-800 px-6 py-4">
           <div className="flex gap-3 items-end">
-            <textarea value={visionInput} onChange={(e) => setVisionInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleVisionChat(); }}} placeholder="Ask about the image..." rows={1} className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors placeholder-gray-600" />
+            <textarea value={visionInput} onChange={(e) => setVisionInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleVisionChat(); }}} placeholder="Ask about the image..." rows={1} className={`flex-1 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors ${isDark ? "bg-gray-900 border border-gray-800 placeholder-gray-600 text-white" : "bg-gray-100 border border-gray-300 placeholder-gray-400 text-gray-900"}`} />
             <button onClick={handleVisionChat} disabled={visionLoading || !visionInput.trim()} className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-3 rounded-xl transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>
             </button>
@@ -683,7 +764,7 @@ const saveCurrentSession = () => {
               {messages.map((msg, i) => (
                 <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                   {msg.role === "assistant" && <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm flex-shrink-0">V</div>}
-                  <div className={`max-w-2xl px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === "user" ? "bg-violet-600 text-white rounded-br-sm" : "bg-gray-900 text-gray-200 rounded-bl-sm border border-gray-800"}`}>
+                  <div className={`max-w-2xl px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === "user" ? "bg-violet-600 text-white rounded-br-sm" : isDark ? "bg-gray-900 text-gray-200 rounded-bl-sm border border-gray-800" : "bg-white text-gray-800 rounded-bl-sm border border-gray-200 shadow-sm"}`}>
                     <MessageContent content={msg.content} />
                   </div>
                 </div>
@@ -702,15 +783,14 @@ const saveCurrentSession = () => {
               )}
               <div ref={bottomRef} />
             </div>
-            <div className="border-t border-gray-800 px-6 py-4">
+            <div className={`border-t px-6 py-4 ${isDark ? "border-gray-800" : "border-gray-200 bg-white"}`}>
               <div className="flex gap-3 items-end">
-                <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKey} placeholder="Ask VisionSync AI anything..." rows={1} className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors placeholder-gray-600" />
+                <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKey} placeholder="Ask VisionSync AI anything..." rows={1} className={`flex-1 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors ${isDark ? "bg-gray-900 border border-gray-800 placeholder-gray-600 text-white" : "bg-gray-100 border border-gray-300 placeholder-gray-400 text-gray-900"}`} />
                 <button onClick={startVoice} disabled={isListening} className={`px-4 py-3 rounded-xl transition-colors ${isListening ? "bg-red-500 animate-pulse cursor-not-allowed" : "bg-gray-800 hover:bg-gray-700"}`} title="Voice Input">🎤</button>
                 <button onClick={sendMessage} disabled={loading || !input.trim()} className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-3 rounded-xl transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>
                 </button>
               </div>
-              <p className="text-xs text-gray-600 mt-2 text-center">Press Enter to send • Shift+Enter for new line</p>
             </div>
           </>
         )}

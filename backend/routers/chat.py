@@ -13,10 +13,11 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 class ChatRequest(BaseModel):
     message: str
     history: list = []
+    system_prompt: str = "You are VisionSync AI, a helpful multimodal AI assistant."
 
 @router.post("/chat")
 async def chat(req: ChatRequest):
-    messages = req.history + [{"role": "user", "content": req.message}]
+    messages = [{"role": "system", "content": req.system_prompt}] + req.history + [{"role": "user", "content": req.message}]
     
     def generate():
         stream = client.chat.completions.create(
