@@ -1,9 +1,17 @@
 import { useState, useRef, useEffect } from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
+
+const LANGUAGES = [
+  "Hindi", "Spanish", "French", "German", "Arabic",
+  "Chinese", "Japanese", "Korean", "Portuguese", "Russian",
+  "Italian", "Bengali", "Urdu", "Tamil", "Telugu"
+];
 
 function renderMarkdown(text: string) {
   let html = text;
@@ -17,18 +25,45 @@ function renderMarkdown(text: string) {
   return html;
 }
 
-const LANGUAGES = [
-  "Hindi", "Spanish", "French", "German", "Arabic",
-  "Chinese", "Japanese", "Korean", "Portuguese", "Russian",
-  "Italian", "Bengali", "Urdu", "Tamil", "Telugu"
-];
+function MessageContent({ content }: { content: string }) {
+  const parts = content.split(/(```[\s\S]*?```)/g);
+  return (
+    <div>
+      {parts.map((part, i) => {
+        if (part.startsWith("```")) {
+          const match = part.match(/```(\w+)?\n?([\s\S]*?)```/);
+          const lang = match?.[1] || "text";
+          const code = match?.[2] || "";
+          return (
+            <div key={i} className="relative my-2">
+              <div className="flex items-center justify-between bg-gray-800 px-3 py-1 rounded-t-lg">
+                <span className="text-xs text-gray-400">{lang}</span>
+                <button onClick={() => navigator.clipboard.writeText(code)} className="text-xs text-gray-400 hover:text-white transition-colors">📋 Copy</button>
+              </div>
+              <SyntaxHighlighter language={lang} style={oneDark} customStyle={{ margin: 0, borderRadius: "0 0 8px 8px", fontSize: "13px" }}>{code}</SyntaxHighlighter>
+            </div>
+          );
+        }
+        let html = part;
+        html = html.replace(/\*\*(.+?)\*\*/gs, '<strong style="font-weight:700;color:white">$1</strong>');
+        html = html.replace(/\*(.+?)\*/gs, '<em>$1</em>');
+        html = html.replace(/^### (.+)$/gm, '<h3 style="font-size:1rem;font-weight:700;margin:12px 0 4px">$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:1.1rem;font-weight:700;margin:12px 0 4px">$1</h2>');
+        html = html.replace(/^# (.+)$/gm, '<h1 style="font-size:1.2rem;font-weight:700;margin:12px 0 4px">$1</h1>');
+        html = html.replace(/^[-=]{3,}$/gm, '<hr style="border-color:#4b5563;margin:8px 0"/>');
+        html = html.replace(/\n/g, '<br/>');
+        return <div key={i} dangerouslySetInnerHTML={{ __html: html }} />;
+      })}
+    </div>
+  );
+}
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision">("chat");
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -44,34 +79,46 @@ function App() {
   const [detectResult, setDetectResult] = useState<{label: string; confidence: number}[]>([]);
   const [detectAnnotated, setDetectAnnotated] = useState<string | null>(null);
   const [detectLoading, setDetectLoading] = useState(false);
+  const [visionImage, setVisionImage] = useState<string | null>(null);
+  const [visionImageB64, setVisionImageB64] = useState<string>("");
+  const [visionContentType, setVisionContentType] = useState<string>("");
+  const [visionMessages, setVisionMessages] = useState<Message[]>([]);
+  const [visionInput, setVisionInput] = useState("");
+  const [visionLoading, setVisionLoading] = useState(false);
+  const visionBottomRef = useRef<HTMLDivElement>(null);
+  const [pdfText, setPdfText] = useState("");
+  const [pdfName, setPdfName] = useState("");
+  const [pdfPages, setPdfPages] = useState(0);
+  const [pdfMessages, setPdfMessages] = useState<Message[]>([]);
+  const [pdfInput, setPdfInput] = useState("");
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfUploading, setPdfUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const pdfBottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    visionBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [visionMessages]);
+
+  useEffect(() => {
+    pdfBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [pdfMessages]);
+
   const startVoice = () => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Your browser does not support Voice Input. Please use Chrome.");
-      return;
-    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) { alert("Use Chrome for Voice Input."); return; }
     const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setInput(transcript);
-    };
-    recognition.onerror = (event: any) => {
-      setIsListening(false);
-      if (event.error === "no-speech") return;
-      alert("Error: " + event.error);
-    };
+    recognition.onresult = (event: any) => setInput(event.results[0][0].transcript);
+    recognition.onerror = (event: any) => { setIsListening(false); if (event.error === "no-speech") return; alert("Error: " + event.error); };
     recognition.start();
   };
 
@@ -79,157 +126,205 @@ function App() {
     const file = e.target.files?.[0];
     if (!file) return;
     setOcrImage(URL.createObjectURL(file));
-    setOcrResult("");
-    setOcrLoading(true);
+    setOcrResult(""); setOcrLoading(true);
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const res = await fetch("http://localhost:8000/api/ocr", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch("http://localhost:8000/api/ocr", { method: "POST", body: formData });
       const data = await res.json();
       setOcrResult(data.text);
-    } catch {
-      setOcrResult("❌ Error: OCR failed.");
-    } finally {
-      setOcrLoading(false);
-    }
+    } catch { setOcrResult("❌ Error: OCR failed."); }
+    finally { setOcrLoading(false); }
   };
 
   const handleSummarize = async () => {
     if (!summaryText.trim()) return;
-    setSummaryResult("");
-    setSummaryLoading(true);
+    setSummaryResult(""); setSummaryLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/summarize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: summaryText, length: summaryLength }),
-      });
+      const res = await fetch("http://localhost:8000/api/summarize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: summaryText, length: summaryLength }) });
       const data = await res.json();
       setSummaryResult(data.summary);
-    } catch {
-      setSummaryResult("❌ Error: Summarizer failed.");
-    } finally {
-      setSummaryLoading(false);
-    }
+    } catch { setSummaryResult("❌ Error: Summarizer failed."); }
+    finally { setSummaryLoading(false); }
   };
 
   const handleTranslate = async () => {
     if (!translateText.trim()) return;
-    setTranslateResult("");
-    setTranslateLoading(true);
+    setTranslateResult(""); setTranslateLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: translateText, target_language: targetLanguage }),
-      });
+      const res = await fetch("http://localhost:8000/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: translateText, target_language: targetLanguage }) });
       const data = await res.json();
       setTranslateResult(data.translated);
-    } catch {
-      setTranslateResult("❌ Error: Translation failed.");
-    } finally {
-      setTranslateLoading(false);
-    }
+    } catch { setTranslateResult("❌ Error: Translation failed."); }
+    finally { setTranslateLoading(false); }
   };
 
   const handleDetection = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setDetectImage(URL.createObjectURL(file));
-    setDetectResult([]);
-    setDetectAnnotated(null);
-    setDetectLoading(true);
+    setDetectResult([]); setDetectAnnotated(null); setDetectLoading(true);
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const res = await fetch("http://localhost:8000/api/detect", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch("http://localhost:8000/api/detect", { method: "POST", body: formData });
       const data = await res.json();
       setDetectResult(data.detections);
       setDetectAnnotated(data.annotated_image);
-    } catch {
-      alert("❌ Error: Object Detection failed.");
-    } finally {
-      setDetectLoading(false);
-    }
+    } catch { alert("❌ Error: Object Detection failed."); }
+    finally { setDetectLoading(false); }
   };
+
+  const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPdfName(file.name);
+    setPdfText(""); setPdfMessages([]); setPdfUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("http://localhost:8000/api/pdf-upload", { method: "POST", body: formData });
+      const data = await res.json();
+      setPdfText(data.text);
+      setPdfPages(data.pages);
+    } catch { alert("❌ Error: PDF upload failed."); }
+    finally { setPdfUploading(false); }
+  };
+
+  const handlePDFChat = async () => {
+    if (!pdfInput.trim() || !pdfText) return;
+    const userMsg: Message = { role: "user", content: pdfInput };
+    setPdfMessages((prev) => [...prev, userMsg]);
+    const currentInput = pdfInput;
+    setPdfInput(""); setPdfLoading(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/pdf-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: currentInput, pdf_text: pdfText }),
+      });
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let aiText = "";
+      setPdfMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        aiText += decoder.decode(value);
+        setPdfMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: "assistant", content: aiText };
+          return updated;
+        });
+      }
+    } catch { setPdfMessages((prev) => [...prev, { role: "assistant", content: "❌ Error: PDF chat failed." }]); }
+    finally { setPdfLoading(false); }
+  };
+
+  const handleVisionUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setVisionImage(URL.createObjectURL(file));
+  setVisionContentType(file.type);
+  setVisionMessages([]);
+  const reader = new FileReader();
+  reader.onload = () => {
+    const b64 = (reader.result as string).split(",")[1];
+    setVisionImageB64(b64);
+  };
+  reader.readAsDataURL(file);
+};
+
+const handleVisionChat = async () => {
+  if (!visionInput.trim() || !visionImageB64) return;
+  const userMsg: Message = { role: "user", content: visionInput };
+  setVisionMessages((prev) => [...prev, userMsg]);
+  const currentInput = visionInput;
+  setVisionInput(""); setVisionLoading(true);
+  try {
+    const res = await fetch("http://localhost:8000/api/vision-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: currentInput, image_base64: visionImageB64, content_type: visionContentType }),
+    });
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let aiText = "";
+    setVisionMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      aiText += decoder.decode(value);
+      setVisionMessages((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: "assistant", content: aiText };
+        return updated;
+      });
+    }
+  } catch { setVisionMessages((prev) => [...prev, { role: "assistant", content: "❌ Error: Vision chat failed." }]); }
+  finally { setVisionLoading(false); }
+};
 
   const sendMessage = async () => {
     if (!input.trim()) return;
     const userMsg: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setLoading(true);
+    const currentInput = input;
+    setInput(""); setLoading(true);
     try {
       const res = await fetch("http://localhost:8000/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ message: currentInput, history: messages.map((m) => ({ role: m.role, content: m.content })) }),
       });
-      const data = await res.json();
-      const aiMsg: Message = { role: "assistant", content: data.reply };
-      setMessages((prev) => [...prev, aiMsg]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "❌ Error: Backend se connect nahi ho paya." },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let aiText = "";
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        aiText += decoder.decode(value);
+        setMessages((prev) => { const updated = [...prev]; updated[updated.length - 1] = { role: "assistant", content: aiText }; return updated; });
+      }
+    } catch { setMessages((prev) => [...prev, { role: "assistant", content: "❌ Error: Backend se connect nahi ho paya." }]); }
+    finally { setLoading(false); }
   };
 
-  const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+  const handleKey = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+  const handlePDFKey = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePDFChat(); } };
 
   return (
     <div className="flex h-screen bg-gray-950 text-white">
-      {/* Sidebar */}
-      <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col p-4">
+      <div className="w-64 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col p-4">
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm font-bold">V</div>
           <span className="font-bold text-lg">VisionSync AI</span>
         </div>
         <nav className="flex flex-col gap-2">
-          <button onClick={() => setActiveTab("chat")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium ${activeTab === "chat" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>
-            💬 AI Chat
-          </button>
-          <button onClick={() => setActiveTab("ocr")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "ocr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>
-            📷 OCR Scanner
-          </button>
-          <button onClick={() => setActiveTab("summarizer")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "summarizer" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>
-            📄 Summarizer
-          </button>
-          <button onClick={() => setActiveTab("translator")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "translator" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>
-            🌐 Translator
-          </button>
-          <button onClick={() => setActiveTab("detection")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "detection" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>
-            🎯 Object Detection
-          </button>
+          <button onClick={() => setActiveTab("chat")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium ${activeTab === "chat" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>💬 AI Chat</button>
+          <button onClick={() => setActiveTab("pdf")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "pdf" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📑 PDF Chat</button>
+          <button onClick={() => setActiveTab("ocr")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "ocr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📷 OCR Scanner</button>
+          <button onClick={() => setActiveTab("summarizer")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "summarizer" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📄 Summarizer</button>
+          <button onClick={() => setActiveTab("translator")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "translator" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🌐 Translator</button>
+          <button onClick={() => setActiveTab("detection")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "detection" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎯 Object Detection</button>
+          <button onClick={() => setActiveTab("vision")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "vision" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>
+  🖼️ Vision Chat
+</button>
         </nav>
-        <div className="mt-auto text-xs text-gray-600 text-center">Powered by Snapdragon AI</div>
+        <div className="mt-auto">
+          <button onClick={() => setMessages([])} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 text-gray-400 text-sm mb-2">🗑️ New Chat</button>
+          <p className="text-xs text-gray-600 text-center">Powered by Snapdragon AI</p>
+        </div>
       </div>
 
-      {/* Main Area */}
       <div className="flex-1 flex flex-col">
-        {/* Header */}
         <div className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : "Object Detection"}
             </h1>
-            <p className="text-xs text-gray-500">
-              {activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq"}
-            </p>
+            <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -237,8 +332,85 @@ function App() {
           </div>
         </div>
 
-        {/* OCR Tab */}
-        {activeTab === "ocr" ? (
+        {activeTab === "pdf" ? (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {!pdfText ? (
+              <div className="flex-1 flex flex-col items-center justify-center px-6">
+                <div className="w-full max-w-2xl">
+                  <h2 className="text-xl font-semibold mb-2">📑 PDF Chat</h2>
+                  <p className="text-gray-500 text-sm mb-6">Upload a PDF and chat with it using AI</p>
+                  <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:border-violet-500 transition-colors bg-gray-900">
+                    <div className="text-4xl mb-2">📄</div>
+                    <p className="text-gray-400 text-sm">Click to upload PDF</p>
+                    <p className="text-gray-600 text-xs mt-1">PDF files only</p>
+                    <input type="file" accept=".pdf" className="hidden" onChange={handlePDFUpload} />
+                  </label>
+                  {pdfUploading && (
+                    <div className="mt-6 flex items-center gap-3 text-violet-400">
+                      <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-sm">Processing PDF...</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="bg-gray-900 border-b border-gray-800 px-6 py-2 flex items-center gap-3">
+                  <span className="text-2xl">📄</span>
+                  <div>
+                    <p className="text-sm font-medium">{pdfName}</p>
+                    <p className="text-xs text-gray-500">{pdfPages} pages loaded</p>
+                  </div>
+                  <button onClick={() => { setPdfText(""); setPdfName(""); setPdfMessages([]); }} className="ml-auto text-xs text-gray-500 hover:text-red-400">✕ Remove</button>
+                </div>
+                <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
+                  {pdfMessages.length === 0 && (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 mt-20">
+                      <div className="w-16 h-16 bg-violet-600/20 rounded-2xl flex items-center justify-center text-3xl">📑</div>
+                      <h2 className="text-xl font-semibold">PDF Ready!</h2>
+                      <p className="text-gray-500 text-sm">Ask anything about your document</p>
+                      <div className="grid grid-cols-2 gap-3 mt-4 w-full max-w-md">
+                        {["Summarize this document", "What are the key points?", "Explain the main topic", "List important facts"].map((s) => (
+                          <button key={s} onClick={() => setPdfInput(s)} className="text-left px-4 py-3 rounded-xl bg-gray-900 border border-gray-800 hover:border-violet-500 text-sm text-gray-400 hover:text-white transition-all">{s}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {pdfMessages.map((msg, i) => (
+                    <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      {msg.role === "assistant" && <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm flex-shrink-0">V</div>}
+                      <div className={`max-w-2xl px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === "user" ? "bg-violet-600 text-white rounded-br-sm" : "bg-gray-900 text-gray-200 rounded-bl-sm border border-gray-800"}`}>
+                        <MessageContent content={msg.content} />
+                      </div>
+                    </div>
+                  ))}
+                  {pdfLoading && (
+                    <div className="flex gap-3 justify-start">
+                      <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm">V</div>
+                      <div className="bg-gray-900 border border-gray-800 px-4 py-3 rounded-2xl rounded-bl-sm">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                          <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                          <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={pdfBottomRef} />
+                </div>
+                <div className="border-t border-gray-800 px-6 py-4">
+                  <div className="flex gap-3 items-end">
+                    <textarea value={pdfInput} onChange={(e) => setPdfInput(e.target.value)} onKeyDown={handlePDFKey} placeholder="Ask about your PDF..." rows={1} className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors placeholder-gray-600" />
+                    <button onClick={handlePDFChat} disabled={pdfLoading || !pdfInput.trim()} className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-3 rounded-xl transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+        ) : activeTab === "ocr" ? (
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 gap-6 overflow-y-auto">
             <div className="w-full max-w-2xl">
               <h2 className="text-xl font-semibold mb-2">📷 OCR Scanner</h2>
@@ -250,12 +422,7 @@ function App() {
                 <input type="file" accept="image/*" className="hidden" onChange={handleOCR} />
               </label>
               {ocrImage && <div className="mt-6"><img src={ocrImage} alt="Uploaded" className="w-full max-h-64 object-contain rounded-xl border border-gray-800" /></div>}
-              {ocrLoading && (
-                <div className="mt-6 flex items-center gap-3 text-violet-400">
-                  <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-sm">Extracting text with AI Vision...</span>
-                </div>
-              )}
+              {ocrLoading && <div className="mt-6 flex items-center gap-3 text-violet-400"><div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div><span className="text-sm">Extracting text...</span></div>}
               {ocrResult && (
                 <div className="mt-6">
                   <h3 className="text-sm font-semibold text-gray-400 mb-2">Extracted Text:</h3>
@@ -278,9 +445,7 @@ function App() {
                   <button key={l} onClick={() => setSummaryLength(l)} className={`px-3 py-1 rounded-lg text-xs capitalize ${summaryLength === l ? "bg-violet-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>{l}</button>
                 ))}
               </div>
-              <button onClick={handleSummarize} disabled={summaryLoading || !summaryText.trim()} className="mt-4 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed py-3 rounded-xl text-sm font-medium transition-colors">
-                {summaryLoading ? "Summarizing..." : "✨ Summarize"}
-              </button>
+              <button onClick={handleSummarize} disabled={summaryLoading || !summaryText.trim()} className="mt-4 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed py-3 rounded-xl text-sm font-medium transition-colors">{summaryLoading ? "Summarizing..." : "✨ Summarize"}</button>
               {summaryResult && (
                 <div className="mt-6">
                   <h3 className="text-sm font-semibold text-gray-400 mb-2">Summary:</h3>
@@ -305,9 +470,7 @@ function App() {
                   ))}
                 </div>
               </div>
-              <button onClick={handleTranslate} disabled={translateLoading || !translateText.trim()} className="mt-4 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed py-3 rounded-xl text-sm font-medium transition-colors">
-                {translateLoading ? "Translating..." : "🌐 Translate"}
-              </button>
+              <button onClick={handleTranslate} disabled={translateLoading || !translateText.trim()} className="mt-4 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed py-3 rounded-xl text-sm font-medium transition-colors">{translateLoading ? "Translating..." : "🌐 Translate"}</button>
               {translateResult && (
                 <div className="mt-6">
                   <h3 className="text-sm font-semibold text-gray-400 mb-2">Translation ({targetLanguage}):</h3>
@@ -329,21 +492,8 @@ function App() {
                 <p className="text-gray-600 text-xs mt-1">PNG, JPG, JPEG supported</p>
                 <input type="file" accept="image/*" className="hidden" onChange={handleDetection} />
               </label>
-
-              {detectLoading && (
-                <div className="mt-6 flex items-center gap-3 text-violet-400">
-                  <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-sm">Detecting objects with YOLOv8...</span>
-                </div>
-              )}
-
-              {detectAnnotated && (
-                <div className="mt-6">
-                  <h3 className="text-sm font-semibold text-gray-400 mb-2">Detected Objects:</h3>
-                  <img src={detectAnnotated} alt="Annotated" className="w-full rounded-xl border border-gray-800" />
-                </div>
-              )}
-
+              {detectLoading && <div className="mt-6 flex items-center gap-3 text-violet-400"><div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div><span className="text-sm">Detecting objects...</span></div>}
+              {detectAnnotated && <div className="mt-6"><h3 className="text-sm font-semibold text-gray-400 mb-2">Detected Objects:</h3><img src={detectAnnotated} alt="Annotated" className="w-full rounded-xl border border-gray-800" /></div>}
               {detectResult.length > 0 && (
                 <div className="mt-4">
                   <h3 className="text-sm font-semibold text-gray-400 mb-2">Detection Results:</h3>
@@ -360,7 +510,74 @@ function App() {
             </div>
           </div>
 
-        ) : (
+        ) : activeTab === "vision" ? 
+  <div className="flex-1 flex flex-col overflow-hidden">
+    {!visionImage ? (
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
+        <div className="w-full max-w-2xl">
+          <h2 className="text-xl font-semibold mb-2">🖼️ Vision Chat</h2>
+          <p className="text-gray-500 text-sm mb-6">Upload an image and ask AI anything about it</p>
+          <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:border-violet-500 transition-colors bg-gray-900">
+            <div className="text-4xl mb-2">🖼️</div>
+            <p className="text-gray-400 text-sm">Click to upload image</p>
+            <p className="text-gray-600 text-xs mt-1">PNG, JPG, JPEG supported</p>
+            <input type="file" accept="image/*" className="hidden" onChange={handleVisionUpload} />
+          </label>
+        </div>
+      </div>
+    ) : (
+      <>
+        <div className="border-b border-gray-800 px-6 py-2 flex items-center gap-3">
+          <img src={visionImage} className="w-12 h-12 rounded-lg object-cover border border-gray-700" />
+          <p className="text-sm text-gray-400">Image loaded — ask anything!</p>
+          <button onClick={() => { setVisionImage(null); setVisionImageB64(""); setVisionMessages([]); }} className="ml-auto text-xs text-gray-500 hover:text-red-400">✕ Remove</button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
+          {visionMessages.length === 0 && (
+            <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 mt-20">
+              <p className="text-gray-500 text-sm">Ask anything about the image!</p>
+              <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                {["What is in this image?", "Describe this image", "What text is visible?", "What colors are dominant?"].map((s) => (
+                  <button key={s} onClick={() => setVisionInput(s)} className="text-left px-4 py-3 rounded-xl bg-gray-900 border border-gray-800 hover:border-violet-500 text-sm text-gray-400 hover:text-white transition-all">{s}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {visionMessages.map((msg, i) => (
+            <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              {msg.role === "assistant" && <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm flex-shrink-0">V</div>}
+              <div className={`max-w-2xl px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === "user" ? "bg-violet-600 text-white rounded-br-sm" : "bg-gray-900 text-gray-200 rounded-bl-sm border border-gray-800"}`}>
+                <MessageContent content={msg.content} />
+              </div>
+            </div>
+          ))}
+          {visionLoading && (
+            <div className="flex gap-3 justify-start">
+              <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm">V</div>
+              <div className="bg-gray-900 border border-gray-800 px-4 py-3 rounded-2xl rounded-bl-sm">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                  <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                  <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={visionBottomRef} />
+        </div>
+        <div className="border-t border-gray-800 px-6 py-4">
+          <div className="flex gap-3 items-end">
+            <textarea value={visionInput} onChange={(e) => setVisionInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleVisionChat(); }}} placeholder="Ask about the image..." rows={1} className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors placeholder-gray-600" />
+            <button onClick={handleVisionChat} disabled={visionLoading || !visionInput.trim()} className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-3 rounded-xl transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>
+            </button>
+          </div>
+        </div>
+      </>
+    )}
+  </div>
+        
+       : (
           <>
             <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
               {messages.length === 0 && (
@@ -379,7 +596,7 @@ function App() {
                 <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                   {msg.role === "assistant" && <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm flex-shrink-0">V</div>}
                   <div className={`max-w-2xl px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === "user" ? "bg-violet-600 text-white rounded-br-sm" : "bg-gray-900 text-gray-200 rounded-bl-sm border border-gray-800"}`}>
-                    <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+                    <MessageContent content={msg.content} />
                   </div>
                 </div>
               ))}
@@ -402,9 +619,7 @@ function App() {
                 <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKey} placeholder="Ask VisionSync AI anything..." rows={1} className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors placeholder-gray-600" />
                 <button onClick={startVoice} disabled={isListening} className={`px-4 py-3 rounded-xl transition-colors ${isListening ? "bg-red-500 animate-pulse cursor-not-allowed" : "bg-gray-800 hover:bg-gray-700"}`} title="Voice Input">🎤</button>
                 <button onClick={sendMessage} disabled={loading || !input.trim()} className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-3 rounded-xl transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                  </svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>
                 </button>
               </div>
               <p className="text-xs text-gray-600 mt-2 text-center">Press Enter to send • Shift+Enter for new line</p>

@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from groq import Groq
 import os
@@ -11,11 +12,21 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 class ChatRequest(BaseModel):
     message: str
+    history: list = []
 
 @router.post("/chat")
 async def chat(req: ChatRequest):
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": req.message}]
-    )
-    return {"reply": response.choices[0].message.content}
+    messages = req.history + [{"role": "user", "content": req.message}]
+    
+    def generate():
+        stream = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            stream=True
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+
+    return StreamingResponse(generate(), media_type="text/plain")
