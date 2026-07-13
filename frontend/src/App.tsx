@@ -108,7 +108,6 @@ function App() {
   const [translateResult, setTranslateResult] = useState("");
   const [translateLoading, setTranslateLoading] = useState(false);
   const [targetLanguage, setTargetLanguage] = useState("Hindi");
-  const [detectImage, setDetectImage] = useState<string | null>(null);
   const [detectResult, setDetectResult] = useState<{label: string; confidence: number}[]>([]);
   const [detectAnnotated, setDetectAnnotated] = useState<string | null>(null);
   const [detectLoading, setDetectLoading] = useState(false);
@@ -283,7 +282,6 @@ const closeCamera = () => {
   const handleDetection = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setDetectImage(URL.createObjectURL(file));
     setDetectResult([]); setDetectAnnotated(null); setDetectLoading(true);
     const formData = new FormData();
     formData.append("file", file);
