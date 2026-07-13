@@ -2,6 +2,14 @@ import { useState, useRef, useEffect } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: number;
+  temporary: boolean;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -95,6 +103,12 @@ function App() {
   const [pdfUploading, setPdfUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pdfBottomRef = useRef<HTMLDivElement>(null);
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+  const saved = localStorage.getItem("visionsync-sessions");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [currentSessionId, setCurrentSessionId] = useState<string>("");
+  const [isTemporary, setIsTemporary] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -107,6 +121,12 @@ function App() {
   useEffect(() => {
     pdfBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [pdfMessages]);
+
+  useEffect(() => {
+    if (!isTemporary) {
+      localStorage.setItem("visionsync-sessions", JSON.stringify(sessions));
+    }
+  }, [sessions, isTemporary]);
 
   const startVoice = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -289,7 +309,51 @@ const handleVisionChat = async () => {
       }
     } catch { setMessages((prev) => [...prev, { role: "assistant", content: "❌ Error: Backend se connect nahi ho paya." }]); }
     finally { setLoading(false); }
+    setTimeout(() => saveCurrentSession(), 500);
   };
+
+  const createNewChat = () => {
+  if (messages.length > 0 && !isTemporary && currentSessionId === "") {
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      title: messages[0].content.slice(0, 40) + "...",
+      messages: messages,
+      createdAt: Date.now(),
+      temporary: false,
+    };
+    setSessions((prev) => [newSession, ...prev]);
+  }
+  setMessages([]);
+  setCurrentSessionId("");
+  setInput("");
+};
+
+const loadSession = (session: ChatSession) => {
+  setMessages(session.messages);
+  setCurrentSessionId(session.id);
+  setActiveTab("chat");
+};
+
+const deleteSession = (id: string) => {
+  setSessions((prev) => prev.filter((s) => s.id !== id));
+};
+
+const saveCurrentSession = () => {
+  if (messages.length === 0 || isTemporary) return;
+  if (currentSessionId) {
+    setSessions((prev) => prev.map((s) => s.id === currentSessionId ? { ...s, messages } : s));
+  } else {
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      title: messages[0].content.slice(0, 40) + "...",
+      messages,
+      createdAt: Date.now(),
+      temporary: false,
+    };
+    setSessions((prev) => [newSession, ...prev]);
+    setCurrentSessionId(newSession.id);
+  }
+};
 
   const handleKey = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
   const handlePDFKey = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePDFChat(); } };
@@ -312,10 +376,26 @@ const handleVisionChat = async () => {
   🖼️ Vision Chat
 </button>
         </nav>
-        <div className="mt-auto">
-          <button onClick={() => setMessages([])} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 text-gray-400 text-sm mb-2">🗑️ New Chat</button>
-          <p className="text-xs text-gray-600 text-center">Powered by Snapdragon AI</p>
+        <div className="mt-4 flex-1 overflow-y-auto">
+  {sessions.length > 0 && (
+    <div>
+      <p className="text-xs text-gray-600 px-3 mb-2 uppercase tracking-wider">History</p>
+      {sessions.map((s) => (
+        <div key={s.id} className="group flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-gray-800 cursor-pointer mb-1" onClick={() => loadSession(s)}>
+          <span className="text-xs text-gray-400 truncate flex-1">💬 {s.title}</span>
+          <button onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }} className="hidden group-hover:block text-gray-600 hover:text-red-400 text-xs px-1">✕</button>
         </div>
+      ))}
+    </div>
+  )}
+</div>
+
+<div className="border-t border-gray-800 pt-3 mt-2">
+  <button onClick={createNewChat} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 text-gray-400 text-sm mb-2">
+    🗑️ New Chat
+  </button>
+  <p className="text-xs text-gray-600 text-center">Powered by Snapdragon AI</p>
+</div>
       </div>
 
       <div className="flex-1 flex flex-col">
@@ -326,10 +406,18 @@ const handleVisionChat = async () => {
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-xs text-gray-400">Online</span>
-          </div>
+          <div className="flex items-center gap-3">
+  <button
+    onClick={() => { setIsTemporary(!isTemporary); setMessages([]); setCurrentSessionId(""); }}
+    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${isTemporary ? "bg-yellow-600/20 text-yellow-400 border border-yellow-600/30" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}
+  >
+    ⚡ {isTemporary ? "Temporary ON" : "Temporary"}
+  </button>
+  <div className="flex items-center gap-2">
+    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+    <span className="text-xs text-gray-400">Online</span>
+  </div>
+</div>
         </div>
 
         {activeTab === "pdf" ? (
