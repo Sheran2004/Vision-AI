@@ -126,6 +126,7 @@ function App() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfUploading, setPdfUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const pdfBottomRef = useRef<HTMLDivElement>(null);
   const [isDark, setIsDark] = useState(true);
   const [systemPrompt, setSystemPrompt] = useState("You are VisionSync AI, a helpful multimodal AI assistant.");
@@ -517,7 +518,7 @@ const saveCurrentSession = () => {
   </div>
 )}
 
-      <div className={`w-64 flex-shrink-0 flex flex-col p-4 ${isDark ? "bg-gray-900 border-r border-gray-800" : "bg-white border-r border-gray-200"}`}>
+      <div className={`fixed md:relative z-40 h-full flex-shrink-0 flex flex-col p-4 transition-transform duration-300 ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"} w-64 ${isDark ? "bg-gray-900 border-r border-gray-800" : "bg-white border-r border-gray-200"}`}>
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm font-bold">V</div>
           <span className="font-bold text-lg">VisionSync AI</span>
@@ -554,9 +555,16 @@ const saveCurrentSession = () => {
   <p className="text-xs text-gray-600 text-center">Powered by Snapdragon AI</p>
 </div>
       </div>
-
+        {sidebarOpen && (
+                <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
+              )}
       <div className="flex-1 flex flex-col">
         <div className={`border-b px-6 py-4 flex items-center justify-between ${isDark ? "border-gray-800" : "border-gray-200 bg-white"}`}>
+          <div className="flex items-center">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden mr-3 text-gray-400 hover:text-white text-xl">
+              ☰
+            </button>
+          </div>
           <div>
             <h1 className="font-semibold text-lg">
               {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : "Object Detection"}
