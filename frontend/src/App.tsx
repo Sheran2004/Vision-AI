@@ -541,7 +541,7 @@ const saveCurrentSession = () => {
       {sessions.map((s) => (
         <div key={s.id} className="group flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-gray-800 cursor-pointer mb-1" onClick={() => loadSession(s)}>
           <span className="text-xs text-gray-400 truncate flex-1">💬 {s.title}</span>
-          <button onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }} className="hidden group-hover:block text-gray-600 hover:text-red-400 text-xs px-1">✕</button>
+          <button onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }} className="text-gray-600 hover:text-red-400 text-xs px-1 flex-shrink-0">✕</button>
         </div>
       ))}
     </div>
