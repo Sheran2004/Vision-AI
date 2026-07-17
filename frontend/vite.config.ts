@@ -8,30 +8,35 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
-      manifest: {
-        name: 'VisionSync AI',
-        short_name: 'VisionSync',
-        description: 'An On-Device Multimodal AI Assistant',
-        theme_color: '#7c3aed',
-        background_color: '#030712',
-        display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          {
-            src: '/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: '/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
+  registerType: 'autoUpdate',
+  devOptions: {
+    enabled: true
+  },
+  manifest: {
+    name: 'VisionSync AI',
+    short_name: 'VisionSync',
+    description: 'An On-Device Multimodal AI Assistant',
+    theme_color: '#7c3aed',
+    background_color: '#030712',
+    display: 'standalone',
+    orientation: 'portrait',
+    scope: '/',
+    start_url: '/',
+    icons: [
+      {
+        src: '/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any maskable'
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any maskable'
       }
-    })
+    ]
+  }
+})
   ],
 })
