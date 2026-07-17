@@ -459,7 +459,7 @@ const saveCurrentSession = () => {
   const handlePDFKey = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePDFChat(); } };
 
   return (
-    <div className={`flex h-screen ${isDark ? "bg-gray-950 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`flex h-screen overflow-hidden ${isDark ? "bg-gray-950 text-white" : "bg-gray-50 text-gray-900"}`}>
       {showSystemPrompt && (
   <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
     <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-lg mx-4">

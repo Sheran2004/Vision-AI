@@ -9,6 +9,19 @@ from routers import chat, ocr, summarizer, translator, detection, pdf_chat
 from routers import chat, ocr, summarizer, translator, detection, pdf_chat, vision
 
 app = FastAPI(title="VisionSync AI", version="1.0.0")
+import threading
+import time
+import urllib.request
+
+def keep_alive():
+    while True:
+        time.sleep(840)  # 14 minutes
+        try:
+            urllib.request.urlopen("https://visionsync-backend.onrender.com")
+        except:
+            pass
+
+threading.Thread(target=keep_alive, daemon=True).start()
 app.include_router(vision.router, prefix="/api")
 app.include_router(pdf_chat.router, prefix="/api")
 app.include_router(detection.router, prefix="/api")
