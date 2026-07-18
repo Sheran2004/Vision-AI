@@ -561,7 +561,7 @@ const saveCurrentSession = () => {
       <div className="flex-1 flex flex-col">
         <div className={`border-b px-6 py-4 flex items-center justify-between ${isDark ? "border-gray-800" : "border-gray-200 bg-white"}`}>
           <div className="flex items-center">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden mr-3 text-gray-400 hover:text-white text-2xl">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="mr-3 text-gray-400 hover:text-white text-2xl">
               ☰
             </button>
           </div>
