@@ -519,9 +519,14 @@ const saveCurrentSession = () => {
 )}
 
       <div className={`fixed z-40 h-full flex flex-col p-4 transition-transform duration-300 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} w-72 ${isDark ? "bg-gray-900 border-r border-gray-800" : "bg-white border-r border-gray-200"}`}>
-        <div className="flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm font-bold">V</div>
-          <span className="font-bold text-lg">VisionSync AI</span>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm font-bold">V</div>
+            <span className="font-bold text-lg">VisionSync AI</span>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} className="text-gray-400 hover:text-white text-xl">
+            ✕
+          </button>
         </div>
         <nav className="flex flex-col gap-2">
           <button onClick={() => setActiveTab("chat")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium ${activeTab === "chat" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>💬 AI Chat</button>
