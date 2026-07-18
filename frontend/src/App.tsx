@@ -518,7 +518,7 @@ const saveCurrentSession = () => {
   </div>
 )}
 
-      <div className={`fixed md:relative z-40 h-full flex-shrink-0 flex flex-col p-4 transition-transform duration-300 ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"} w-64 ${isDark ? "bg-gray-900 border-r border-gray-800" : "bg-white border-r border-gray-200"}`}>
+      <div className={`fixed z-40 h-full flex flex-col p-4 transition-transform duration-300 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} w-72 ${isDark ? "bg-gray-900 border-r border-gray-800" : "bg-white border-r border-gray-200"}`}>
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-sm font-bold">V</div>
           <span className="font-bold text-lg">VisionSync AI</span>
