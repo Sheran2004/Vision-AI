@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { QRCodeSVG } from "qrcode.react";
 
 interface ChatSession {
   id: string;
@@ -96,7 +97,7 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr">("chat") ;
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -116,6 +117,8 @@ function App() {
   const [visionContentType, setVisionContentType] = useState<string>("");
   const [visionMessages, setVisionMessages] = useState<Message[]>([]);
   const [visionInput, setVisionInput] = useState("");
+  const [qrText, setQrText] = useState("");
+  const [qrGenerated, setQrGenerated] = useState(false);
   const [visionLoading, setVisionLoading] = useState(false);
   const visionBottomRef = useRef<HTMLDivElement>(null);
   const [pdfText, setPdfText] = useState("");
@@ -566,6 +569,7 @@ const saveCurrentSession = () => {
           <button onClick={() => setActiveTab("detection")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "detection" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎯 Object Detection</button>
           <button onClick={() => setActiveTab("vision")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "vision" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🖼️ Vision Chat</button>
           <button onClick={() => setActiveTab("search")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "search" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🔍 Web Search</button>
+          <button onClick={() => setActiveTab("qr")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "qr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📱 QR Generator</button>
         </nav>
         <div className="mt-4 flex-1 overflow-y-auto">
   {sessions.length > 0 && (
@@ -600,7 +604,7 @@ const saveCurrentSession = () => {
           </div>
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : "Object Detection"}
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
@@ -941,7 +945,61 @@ const saveCurrentSession = () => {
       )}
     </div>
   </div>
-       ) : (
+       ) : activeTab === "qr" ? (
+  <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
+    <div className="w-full max-w-2xl">
+      <h2 className="text-xl font-semibold mb-2">📱 QR Code Generator</h2>
+      <p className="text-gray-500 text-sm mb-6">Generate QR codes for any text, URL, or data</p>
+
+      <textarea
+        value={qrText}
+        onChange={(e) => { setQrText(e.target.value); setQrGenerated(false); }}
+        placeholder="Enter text, URL, or any data..."
+        rows={4}
+        className={`w-full rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors ${isDark ? "bg-gray-900 border border-gray-800 text-white placeholder-gray-600" : "bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400"}`}
+      />
+
+      <div className="flex flex-wrap gap-2 mt-4">
+        {["https://visionsync-frontend-two.vercel.app", "Hello World", "Contact: +91 9999999999", "Instagram: @username"].map((q) => (
+          <button key={q} onClick={() => { setQrText(q); setQrGenerated(false); }} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 transition-colors truncate max-w-xs">
+            {q}
+          </button>
+        ))}
+      </div>
+
+      <button
+        onClick={() => setQrGenerated(true)}
+        disabled={!qrText.trim()}
+        className="mt-4 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed py-3 rounded-xl text-sm font-medium transition-colors"
+      >
+        📱 Generate QR Code
+      </button>
+
+      {qrGenerated && qrText && (
+        <div className="mt-8 flex flex-col items-center gap-4">
+          <div className="bg-white p-6 rounded-2xl">
+            <QRCodeSVG value={qrText} size={200} level="H" />
+          </div>
+          <p className="text-xs text-gray-500 text-center max-w-xs break-all">{qrText}</p>
+          <button
+            onClick={() => {
+              const canvas = document.querySelector("canvas") as HTMLCanvasElement;
+              if (canvas) {
+                const link = document.createElement("a");
+                link.download = "qrcode.png";
+                link.href = canvas.toDataURL();
+                link.click();
+              }
+            }}
+            className="bg-gray-800 hover:bg-gray-700 px-6 py-2 rounded-lg text-sm transition-colors"
+          >
+            ⬇️ Download QR Code
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+     ) :  (
           <>
             <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
               {messages.length === 0 && (
