@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { QRCodeCanvas } from "qrcode.react";
+import Papa from "papaparse";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 
 interface ChatSession {
   id: string;
@@ -97,7 +99,7 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news">("chat") ;
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data">("chat") ;
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -129,6 +131,14 @@ function App() {
   const [pdfName, setPdfName] = useState("");
   const [pdfPages, setPdfPages] = useState(0);
   const [pdfMessages, setPdfMessages] = useState<Message[]>([]);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvFileName, setCsvFileName] = useState("");
+  const [dataAnalysis, setDataAnalysis] = useState("");
+  const [dataLoading, setDataLoading] = useState(false);
+  const [chartType, setChartType] = useState<"bar" | "line">("bar");
+  const [xAxis, setXAxis] = useState("");
+  const [yAxis, setYAxis] = useState("");
   const [pdfInput, setPdfInput] = useState("");
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfUploading, setPdfUploading] = useState(false);
@@ -251,6 +261,53 @@ const closeCamera = () => {
     stream?.getTracks().forEach(track => track.stop());
   }
   setShowCamera(false);
+};
+
+const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setCsvFileName(file.name);
+  Papa.parse(file, {
+    header: true,
+    complete: (results) => {
+      setCsvData(results.data as any[]);
+      setCsvHeaders(Object.keys(results.data[0] as object));
+      setXAxis(Object.keys(results.data[0] as object)[0]);
+      setYAxis(Object.keys(results.data[0] as object)[1]);
+    }
+  });
+};
+
+const analyzeData = async () => {
+  if (!csvData.length) return;
+  setDataAnalysis("");
+  setDataLoading(true);
+  const sample = csvData.slice(0, 20);
+  try {
+    const res = await fetch("https://visionsync-backend.onrender.com/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `Analyze this CSV data and provide insights, trends, and recommendations:\n\nHeaders: ${csvHeaders.join(", ")}\n\nSample Data:\n${JSON.stringify(sample, null, 2)}`,
+        history: [],
+        system_prompt: "You are a data analyst. Analyze the provided data and give clear insights, trends, patterns, and actionable recommendations."
+      }),
+    });
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    setDataAnalysis(" ");
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value);
+      setDataAnalysis(text);
+    }
+  } catch {
+    setDataAnalysis("❌ Error: Analysis failed.");
+  } finally {
+    setDataLoading(false);
+  }
 };
 
   const handleOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -593,6 +650,7 @@ const saveCurrentSession = () => {
           <button onClick={() => setActiveTab("search")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "search" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🔍 Web Search</button>
           <button onClick={() => setActiveTab("qr")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "qr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📱 QR Generator</button>
           <button onClick={() => { setActiveTab("news"); fetchNews(); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "news" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🌍 News</button>
+          <button onClick={() => setActiveTab("data")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "data" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📊 Data Analyzer</button>
         </nav>
         <div className="mt-4 flex-1 overflow-y-auto">
   {sessions.length > 0 && (
@@ -627,7 +685,7 @@ const saveCurrentSession = () => {
           </div>
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : "Object Detection"}
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
@@ -812,6 +870,73 @@ const saveCurrentSession = () => {
             </div>
           </div>
 
+) : activeTab === "data" ? (
+  <div className="flex-1 flex flex-col px-6 py-6 overflow-y-auto">
+    <div className="w-full max-w-3xl mx-auto">
+      <h2 className="text-xl font-semibold mb-2">📊 Data Analyzer</h2>
+      <p className="text-gray-500 text-sm mb-6">Upload CSV/Excel and get AI-powered analysis with charts</p>
+
+      {!csvData.length ? (
+        <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:border-violet-500 transition-colors bg-gray-900">
+          <div className="text-4xl mb-2">📊</div>
+          <p className="text-gray-400 text-sm">Click to upload CSV file</p>
+          <p className="text-gray-600 text-xs mt-1">CSV files supported</p>
+          <input type="file" accept=".csv" className="hidden" onChange={handleCSVUpload} />
+        </label>
+      ) : (
+        <div>
+          <div className={`flex items-center justify-between p-3 rounded-xl mb-4 ${isDark ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}>
+            <span className="text-sm">📄 {csvFileName} — {csvData.length} rows, {csvHeaders.length} columns</span>
+            <button onClick={() => { setCsvData([]); setCsvHeaders([]); setDataAnalysis(""); }} className="text-xs text-red-400 hover:text-red-300">✕ Remove</button>
+          </div>
+
+          <div className="flex gap-3 mb-4 flex-wrap">
+            <select value={xAxis} onChange={(e) => setXAxis(e.target.value)} className={`px-3 py-2 rounded-lg text-sm ${isDark ? "bg-gray-900 border border-gray-800 text-white" : "bg-gray-100 border border-gray-300"}`}>
+              {csvHeaders.map(h => <option key={h} value={h}>{h} (X)</option>)}
+            </select>
+            <select value={yAxis} onChange={(e) => setYAxis(e.target.value)} className={`px-3 py-2 rounded-lg text-sm ${isDark ? "bg-gray-900 border border-gray-800 text-white" : "bg-gray-100 border border-gray-300"}`}>
+              {csvHeaders.map(h => <option key={h} value={h}>{h} (Y)</option>)}
+            </select>
+            <button onClick={() => setChartType("bar")} className={`px-3 py-2 rounded-lg text-xs ${chartType === "bar" ? "bg-violet-600 text-white" : "bg-gray-800 text-gray-400"}`}>Bar</button>
+            <button onClick={() => setChartType("line")} className={`px-3 py-2 rounded-lg text-xs ${chartType === "line" ? "bg-violet-600 text-white" : "bg-gray-800 text-gray-400"}`}>Line</button>
+          </div>
+
+          <div className={`p-4 rounded-xl mb-4 ${isDark ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}>
+            <ResponsiveContainer width="100%" height={250}>
+              {chartType === "bar" ? (
+                <BarChart data={csvData.slice(0, 20)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey={xAxis} tick={{ fontSize: 10, fill: "#9ca3af" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
+                  <Tooltip />
+                  <Bar dataKey={yAxis} fill="#7c3aed" />
+                </BarChart>
+              ) : (
+                <LineChart data={csvData.slice(0, 20)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey={xAxis} tick={{ fontSize: 10, fill: "#9ca3af" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey={yAxis} stroke="#7c3aed" strokeWidth={2} />
+                </LineChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+
+          <button onClick={analyzeData} disabled={dataLoading} className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 py-3 rounded-xl text-sm font-medium transition-colors mb-4">
+            {dataLoading ? "Analyzing..." : "🤖 Analyze with AI"}
+          </button>
+
+          {dataAnalysis && (
+            <div className={`rounded-xl p-4 text-sm leading-relaxed ${isDark ? "bg-gray-900 border border-gray-800 text-gray-200" : "bg-white border border-gray-200 text-gray-800"}`}>
+              <MessageContent content={dataAnalysis} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+  
         ) : activeTab === "detection" ? (
           <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
             <div className="w-full max-w-2xl">
