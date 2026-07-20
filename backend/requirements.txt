@@ -6,3 +6,4 @@ python-multipart
 pillow
 ultralytics
 pypdf2
+tavily-python
