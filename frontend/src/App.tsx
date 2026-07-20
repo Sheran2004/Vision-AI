@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 
 interface ChatSession {
   id: string;
@@ -978,12 +978,12 @@ const saveCurrentSession = () => {
       {qrGenerated && qrText && (
         <div className="mt-8 flex flex-col items-center gap-4">
           <div className="bg-white p-6 rounded-2xl">
-            <QRCodeSVG value={qrText} size={200} level="H" />
+            <QRCodeCanvas id="qrCanvas" value={qrText} size={200} level="H" />
           </div>
           <p className="text-xs text-gray-500 text-center max-w-xs break-all">{qrText}</p>
           <button
             onClick={() => {
-              const canvas = document.querySelector("canvas") as HTMLCanvasElement;
+              const canvas = document.getElementById("qrCanvas") as HTMLCanvasElement;
               if (canvas) {
                 const link = document.createElement("a");
                 link.download = "qrcode.png";
