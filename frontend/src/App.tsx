@@ -99,10 +99,14 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data">("chat") ;
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio">("chat") ;
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [audioFile, setAudioFile] = useState<string | null>(null);
+  const [audioFileName, setAudioFileName] = useState("");
+  const [audioTranscript, setAudioTranscript] = useState("");
+  const [audioLoading, setAudioLoading] = useState(false);
   const [summaryText, setSummaryText] = useState("");
   const [summaryResult, setSummaryResult] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -262,6 +266,31 @@ const closeCamera = () => {
   }
   setShowCamera(false);
 };
+
+
+const handleAudioTranscribe = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setAudioFileName(file.name);
+  setAudioFile(URL.createObjectURL(file));
+  setAudioTranscript("");
+  setAudioLoading(true);
+  const formData = new FormData();
+  formData.append("file", file);
+  try {
+    const res = await fetch("https://visionsync-backend.onrender.com/api/transcribe", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    setAudioTranscript(data.text);
+  } catch {
+    setAudioTranscript("❌ Error: Transcription failed.");
+  } finally {
+    setAudioLoading(false);
+  }
+};
+
 
 const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -651,6 +680,7 @@ const saveCurrentSession = () => {
           <button onClick={() => setActiveTab("qr")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "qr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📱 QR Generator</button>
           <button onClick={() => { setActiveTab("news"); fetchNews(); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "news" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🌍 News</button>
           <button onClick={() => setActiveTab("data")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "data" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📊 Data Analyzer</button>
+          <button onClick={() => setActiveTab("audio")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "audio" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎵 Audio Transcribe</button>
         </nav>
         <div className="mt-4 flex-1 overflow-y-auto">
   {sessions.length > 0 && (
@@ -685,7 +715,7 @@ const saveCurrentSession = () => {
           </div>
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : "Object Detection"}
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
@@ -793,6 +823,58 @@ const saveCurrentSession = () => {
             )}
           </div>
 
+) : activeTab === "audio" ? (
+  <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
+    <div className="w-full max-w-2xl">
+      <h2 className="text-xl font-semibold mb-2">🎵 Audio Transcription</h2>
+      <p className="text-gray-500 text-sm mb-6">Upload audio file and convert to text using Whisper AI</p>
+
+      <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:border-violet-500 transition-colors bg-gray-900">
+        <div className="text-4xl mb-2">🎵</div>
+        <p className="text-gray-400 text-sm">Click to upload audio file</p>
+        <p className="text-gray-600 text-xs mt-1">MP3, WAV, M4A, OGG supported</p>
+        <input type="file" accept="audio/*" className="hidden" onChange={handleAudioTranscribe} />
+      </label>
+
+      {audioFile && (
+        <div className="mt-4">
+          <audio controls src={audioFile} className="w-full rounded-xl" />
+          <p className="text-xs text-gray-500 mt-1">📁 {audioFileName}</p>
+        </div>
+      )}
+
+      {audioLoading && (
+        <div className="mt-6 flex items-center gap-3 text-violet-400">
+          <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm">Transcribing with Whisper AI...</span>
+        </div>
+      )}
+
+      {audioTranscript && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-gray-400 mb-2">Transcript:</h3>
+          <div className={`rounded-xl p-4 text-sm text-gray-200 leading-relaxed ${isDark ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200 text-gray-800"}`}>
+            {audioTranscript}
+          </div>
+          <div className="flex gap-3 mt-3">
+            <button
+              onClick={() => navigator.clipboard.writeText(audioTranscript)}
+              className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              📋 Copy
+            </button>
+            <button
+              onClick={() => { setInput(audioTranscript); setActiveTab("chat"); }}
+              className="bg-violet-600 hover:bg-violet-500 px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              💬 Send to AI Chat
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+  
         ) : activeTab === "ocr" ? (
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 gap-6 overflow-y-auto">
             <div className="w-full max-w-2xl">
@@ -936,7 +1018,7 @@ const saveCurrentSession = () => {
       )}
     </div>
   </div>
-  
+
         ) : activeTab === "detection" ? (
           <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
             <div className="w-full max-w-2xl">
