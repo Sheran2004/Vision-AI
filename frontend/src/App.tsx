@@ -96,7 +96,7 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search">("chat");
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -129,6 +129,9 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pdfBottomRef = useRef<HTMLDivElement>(null);
   const [isDark, setIsDark] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResult, setSearchResult] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState("You are VisionSync AI, a helpful multimodal AI assistant.");
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const [tempSystemPrompt, setTempSystemPrompt] = useState(systemPrompt);
@@ -269,6 +272,32 @@ const closeCamera = () => {
     finally { setSummaryLoading(false); }
   };
 
+  const handleSearch = async () => {
+  if (!searchQuery.trim()) return;
+  setSearchResult("");
+  setSearchLoading(true);
+  try {
+    const res = await fetch("https://visionsync-backend.onrender.com/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: searchQuery }),
+    });
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    setSearchResult(" ");
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value);
+      setSearchResult(text);
+    }
+  } catch {
+    setSearchResult("❌ Error: Search failed.");
+  } finally {
+    setSearchLoading(false);
+  }
+};
   const handleTranslate = async () => {
     if (!translateText.trim()) return;
     setTranslateResult(""); setTranslateLoading(true);
@@ -536,6 +565,9 @@ const saveCurrentSession = () => {
           <button onClick={() => setActiveTab("translator")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "translator" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🌐 Translator</button>
           <button onClick={() => setActiveTab("detection")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "detection" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎯 Object Detection</button>
           <button onClick={() => setActiveTab("vision")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "vision" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>
+          <button onClick={() => setActiveTab("search")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "search" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>
+  🔍 Web Search
+</button>
   🖼️ Vision Chat
 </button>
         </nav>
@@ -572,7 +604,7 @@ const saveCurrentSession = () => {
           </div>
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : "Object Detection"}
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
@@ -786,7 +818,7 @@ const saveCurrentSession = () => {
             </div>
           </div>
 
-        ) : activeTab === "vision" ? 
+        ) : activeTab === "vision" ? (
   <div className="flex-1 flex flex-col overflow-hidden">
     {!visionImage ? (
       <div className="flex-1 flex flex-col items-center justify-center px-6">
@@ -859,7 +891,61 @@ const saveCurrentSession = () => {
     )}
   </div>
         
-       : (
+  ) : activeTab === "search" ? (
+  <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
+    <div className="w-full max-w-2xl">
+      <h2 className="text-xl font-semibold mb-2">🔍 Web Search</h2>
+      <p className="text-gray-500 text-sm mb-6">Search the internet with AI-powered answers</p>
+      
+      <div className="flex gap-3">
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
+          placeholder="Search anything..."
+          className={`flex-1 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-violet-500 transition-colors ${isDark ? "bg-gray-900 border border-gray-800 text-white placeholder-gray-600" : "bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400"}`}
+        />
+        <button
+          onClick={handleSearch}
+          disabled={searchLoading || !searchQuery.trim()}
+          className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 px-6 py-3 rounded-xl text-sm font-medium transition-colors"
+        >
+          {searchLoading ? "..." : "🔍"}
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-4">
+        {["Latest AI news", "Python tutorials", "Weather today", "Stock market"].map((q) => (
+          <button key={q} onClick={() => setSearchQuery(q)} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 transition-colors">
+            {q}
+          </button>
+        ))}
+      </div>
+
+      {searchLoading && (
+        <div className="mt-6 flex items-center gap-3 text-violet-400">
+          <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm">Searching the web...</span>
+        </div>
+      )}
+
+      {searchResult && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-gray-400 mb-2">Results:</h3>
+          <div className={`rounded-xl p-4 text-sm leading-relaxed ${isDark ? "bg-gray-900 border border-gray-800 text-gray-200" : "bg-white border border-gray-200 text-gray-800"}`}>
+            <MessageContent content={searchResult} />
+          </div>
+          <button
+            onClick={() => { setInput(searchResult); setActiveTab("chat"); }}
+            className="mt-3 bg-violet-600 hover:bg-violet-500 px-4 py-2 rounded-lg text-sm transition-colors"
+          >
+            💬 Send to AI Chat
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+       ) : (
           <>
             <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
               {messages.length === 0 && (
