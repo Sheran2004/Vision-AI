@@ -97,7 +97,7 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr">("chat") ;
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news">("chat") ;
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -117,6 +117,10 @@ function App() {
   const [visionContentType, setVisionContentType] = useState<string>("");
   const [visionMessages, setVisionMessages] = useState<Message[]>([]);
   const [visionInput, setVisionInput] = useState("");
+  const [newsArticles, setNewsArticles] = useState<any[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsCategory, setNewsCategory] = useState("technology");
+  const [newsQuery, setNewsQuery] = useState("");
   const [qrText, setQrText] = useState("");
   const [qrGenerated, setQrGenerated] = useState(false);
   const [visionLoading, setVisionLoading] = useState(false);
@@ -311,6 +315,24 @@ const closeCamera = () => {
     } catch { setTranslateResult("❌ Error: Translation failed."); }
     finally { setTranslateLoading(false); }
   };
+
+
+  const fetchNews = async (category = newsCategory, query = "") => {
+  setNewsLoading(true);
+  setNewsArticles([]);
+  try {
+    const url = query
+      ? `https://visionsync-backend.onrender.com/api/news?query=${encodeURIComponent(query)}`
+      : `https://visionsync-backend.onrender.com/api/news?category=${category}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    setNewsArticles(data.articles || []);
+  } catch {
+    setNewsArticles([]);
+  } finally {
+    setNewsLoading(false);
+  }
+};
 
   const handleDetection = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -570,6 +592,7 @@ const saveCurrentSession = () => {
           <button onClick={() => setActiveTab("vision")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "vision" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🖼️ Vision Chat</button>
           <button onClick={() => setActiveTab("search")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "search" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🔍 Web Search</button>
           <button onClick={() => setActiveTab("qr")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "qr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📱 QR Generator</button>
+          <button onClick={() => { setActiveTab("news"); fetchNews(); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "news" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🌍 News</button>
         </nav>
         <div className="mt-4 flex-1 overflow-y-auto">
   {sessions.length > 0 && (
@@ -604,7 +627,7 @@ const saveCurrentSession = () => {
           </div>
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : "Object Detection"}
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
@@ -999,7 +1022,63 @@ const saveCurrentSession = () => {
       )}
     </div>
   </div>
-     ) :  (
+     
+      ) : activeTab === "news" ? (
+  <div className="flex-1 flex flex-col px-6 py-6 overflow-y-auto">
+    <div className="w-full max-w-3xl mx-auto">
+      <h2 className="text-xl font-semibold mb-2">🌍 Real-time News</h2>
+      <p className="text-gray-500 text-sm mb-4">Latest news powered by NewsAPI</p>
+
+      <div className="flex gap-3 mb-4">
+        <input
+          value={newsQuery}
+          onChange={(e) => setNewsQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") fetchNews(newsCategory, newsQuery); }}
+          placeholder="Search news..."
+          className={`flex-1 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 ${isDark ? "bg-gray-900 border border-gray-800 text-white placeholder-gray-600" : "bg-gray-100 border border-gray-300 text-gray-900"}`}
+        />
+        <button onClick={() => fetchNews(newsCategory, newsQuery)} className="bg-violet-600 hover:bg-violet-500 px-4 py-2 rounded-xl text-sm">🔍</button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-6">
+        {["technology", "business", "health", "science", "sports", "entertainment"].map((cat) => (
+          <button
+            key={cat}
+            onClick={() => { setNewsCategory(cat); fetchNews(cat, ""); }}
+            className={`px-3 py-1 rounded-lg text-xs capitalize ${newsCategory === cat ? "bg-violet-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {newsLoading && (
+        <div className="flex items-center gap-3 text-violet-400 mb-4">
+          <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm">Fetching latest news...</span>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4">
+        {newsArticles.map((article, i) => (
+          <div key={i} className={`rounded-xl p-4 border ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
+            <div className="flex gap-4">
+              {article.urlToImage && (
+                <img src={article.urlToImage} alt="" className="w-24 h-20 object-cover rounded-lg flex-shrink-0" onError={(e) => (e.currentTarget.style.display = "none")} />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-violet-400 mb-1">{article.source} • {new Date(article.publishedAt).toLocaleDateString()}</p>
+                <h3 className="text-sm font-medium leading-snug mb-1 line-clamp-2">{article.title}</h3>
+                <p className="text-xs text-gray-500 line-clamp-2">{article.description}</p>
+                <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-xs text-violet-400 hover:text-violet-300 mt-1 inline-block">Read more →</a>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+     ):(
           <>
             <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
               {messages.length === 0 && (
