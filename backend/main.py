@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import chat, ocr, summarizer, translator, detection, pdf_chat, vision, search
+from routers import chat, ocr, summarizer, translator, detection, pdf_chat, vision, search, news
 
 
 app = FastAPI(title="VisionSync AI", version="1.0.0")
@@ -24,6 +25,7 @@ app.include_router(translator.router, prefix="/api")
 app.include_router(summarizer.router, prefix="/api")
 app.include_router(ocr.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
+app.include_router(news.router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

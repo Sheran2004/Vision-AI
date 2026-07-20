@@ -7,3 +7,4 @@ pillow
 ultralytics
 pypdf2
 tavily-python
+httpx
