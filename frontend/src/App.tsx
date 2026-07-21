@@ -99,7 +99,7 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio" | "meeting" | "medical" | "imagegen">("chat") ;
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio" | "meeting" | "medical" | "imagegen" | "tts">("chat") ;
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -128,6 +128,12 @@ function App() {
   const [meetingLoading, setMeetingLoading] = useState(false);
   const [meetingAudioFile, setMeetingAudioFile] = useState<string | null>(null);
   const [meetingAudioLoading, setMeetingAudioLoading] = useState(false);
+  const [ttsText, setTtsText] = useState("");
+  const [ttsSpeaking, setTtsSpeaking] = useState(false);
+  const [ttsVoice, setTtsVoice] = useState<SpeechSynthesisVoice | null>(null);
+  const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [ttsRate, setTtsRate] = useState(1);
+  const [ttsPitch, setTtsPitch] = useState(1);
   const [targetLanguage, setTargetLanguage] = useState("Hindi");
   const [detectResult, setDetectResult] = useState<{label: string; confidence: number}[]>([]);
   const [detectAnnotated, setDetectAnnotated] = useState<string | null>(null);
@@ -184,6 +190,16 @@ function App() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+  const loadVoices = () => {
+    const voices = window.speechSynthesis.getVoices();
+    setTtsVoices(voices);
+    if (voices.length > 0) setTtsVoice(voices[0]);
+  };
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}, []);
 
   useEffect(() => {
     visionBottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -407,6 +423,24 @@ const handleMeetingAudio = async (e: React.ChangeEvent<HTMLInputElement>) => {
   } finally {
     setMeetingAudioLoading(false);
   }
+};
+
+const speakText = () => {
+  if (!ttsText.trim()) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(ttsText);
+  if (ttsVoice) utterance.voice = ttsVoice;
+  utterance.rate = ttsRate;
+  utterance.pitch = ttsPitch;
+  utterance.onstart = () => setTtsSpeaking(true);
+  utterance.onend = () => setTtsSpeaking(false);
+  utterance.onerror = () => setTtsSpeaking(false);
+  window.speechSynthesis.speak(utterance);
+};
+
+const stopSpeaking = () => {
+  window.speechSynthesis.cancel();
+  setTtsSpeaking(false);
 };
 
 const generateMeetingNotes = async () => {
@@ -824,6 +858,7 @@ const saveCurrentSession = () => {
           <button onClick={() => setActiveTab("meeting")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "meeting" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📝 Meeting Notes</button>
           <button onClick={() => setActiveTab("medical")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "medical" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>💊 Medical Analysis</button>
           <button onClick={() => setActiveTab("imagegen")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "imagegen" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎨 Image Generation</button>
+          <button onClick={() => setActiveTab("tts")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "tts" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🔊 Text to Speech</button>
         </nav>
         <div className="mt-4 flex-1 overflow-y-auto">
   {sessions.length > 0 && (
@@ -858,7 +893,7 @@ const saveCurrentSession = () => {
           </div>
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : activeTab === "meeting" ? "Meeting Notes" : activeTab === "medical" ? "Medical Analysis" : activeTab === "imagegen" ? "Image Generation" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : activeTab === "meeting" ? "Meeting Notes" : activeTab === "medical" ? "Medical Analysis" : activeTab === "imagegen" ? "Image Generation" : activeTab === "tts" ? "Text to Speech" : "Object Detection"}
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
@@ -1095,6 +1130,69 @@ const saveCurrentSession = () => {
             </div>
           </div>
 
+) : activeTab === "tts" ? (
+  <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
+    <div className="w-full max-w-2xl">
+      <h2 className="text-xl font-semibold mb-2">🔊 Text to Speech</h2>
+      <p className="text-gray-500 text-sm mb-6">Convert any text to natural speech</p>
+
+      <textarea
+        value={ttsText}
+        onChange={(e) => setTtsText(e.target.value)}
+        placeholder="Enter text to speak..."
+        rows={6}
+        className={`w-full rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors ${isDark ? "bg-gray-900 border border-gray-800 text-white placeholder-gray-600" : "bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400"}`}
+      />
+
+      <div className="mt-4 grid grid-cols-1 gap-4">
+        <div>
+          <label className="text-xs text-gray-400 mb-1 block">Voice:</label>
+          <select
+            value={ttsVoice?.name || ""}
+            onChange={(e) => setTtsVoice(ttsVoices.find(v => v.name === e.target.value) || null)}
+            className={`w-full px-3 py-2 rounded-lg text-sm ${isDark ? "bg-gray-900 border border-gray-800 text-white" : "bg-gray-100 border border-gray-300 text-gray-900"}`}
+          >
+            {ttsVoices.map(v => <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}
+          </select>
+        </div>
+
+        <div className="flex gap-6">
+          <div className="flex-1">
+            <label className="text-xs text-gray-400 mb-1 block">Speed: {ttsRate}x</label>
+            <input type="range" min="0.5" max="2" step="0.1" value={ttsRate} onChange={(e) => setTtsRate(parseFloat(e.target.value))} className="w-full accent-violet-600" />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs text-gray-400 mb-1 block">Pitch: {ttsPitch}</label>
+            <input type="range" min="0.5" max="2" step="0.1" value={ttsPitch} onChange={(e) => setTtsPitch(parseFloat(e.target.value))} className="w-full accent-violet-600" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-3 mt-4">
+        <button
+          onClick={speakText}
+          disabled={ttsSpeaking || !ttsText.trim()}
+          className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 py-3 rounded-xl text-sm font-medium transition-colors"
+        >
+          {ttsSpeaking ? "🔊 Speaking..." : "🔊 Speak"}
+        </button>
+        {ttsSpeaking && (
+          <button onClick={stopSpeaking} className="bg-red-600 hover:bg-red-500 px-6 py-3 rounded-xl text-sm transition-colors">
+            ⏹ Stop
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-4">
+        {["Hello! I am VisionSync AI.", "Welcome to the future of AI.", "Technology is amazing!"].map((t) => (
+          <button key={t} onClick={() => setTtsText(t)} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 transition-colors">
+            {t}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+  
 ) : activeTab === "data" ? (
   <div className="flex-1 flex flex-col px-6 py-6 overflow-y-auto">
     <div className="w-full max-w-3xl mx-auto">
