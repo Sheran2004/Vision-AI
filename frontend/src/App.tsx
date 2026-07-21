@@ -99,7 +99,7 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio" | "meeting">("chat") ;
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio" | "meeting" | "medical">("chat") ;
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -107,6 +107,12 @@ function App() {
   const [audioFileName, setAudioFileName] = useState("");
   const [audioTranscript, setAudioTranscript] = useState("");
   const [audioLoading, setAudioLoading] = useState(false);
+  const [medicalImage, setMedicalImage] = useState<string | null>(null);
+  const [medicalImageB64, setMedicalImageB64] = useState<string>("");
+  const [medicalContentType, setMedicalContentType] = useState<string>("");
+  const [medicalResult, setMedicalResult] = useState<string>("");
+  const [medicalLoading, setMedicalLoading] = useState(false);
+  const [medicalQuery, setMedicalQuery] = useState("Analyze this medical image and provide detailed observations.");
   const [summaryText, setSummaryText] = useState("");
   const [summaryResult, setSummaryResult] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -272,6 +278,51 @@ const closeCamera = () => {
   setShowCamera(false);
 };
 
+const handleMedicalUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setMedicalImage(URL.createObjectURL(file));
+  setMedicalContentType(file.type);
+  setMedicalResult("");
+  const reader = new FileReader();
+  reader.onload = () => {
+    const b64 = (reader.result as string).split(",")[1];
+    setMedicalImageB64(b64);
+  };
+  reader.readAsDataURL(file);
+};
+
+const analyzeMedicalImage = async () => {
+  if (!medicalImageB64) return;
+  setMedicalResult("");
+  setMedicalLoading(true);
+  try {
+    const res = await fetch("https://visionsync-backend.onrender.com/api/vision-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: medicalQuery,
+        image_base64: medicalImageB64,
+        content_type: medicalContentType,
+        system_prompt: "You are a medical AI assistant. Analyze medical images carefully and provide detailed observations. Always remind users to consult a qualified healthcare professional for proper diagnosis."
+      }),
+    });
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    setMedicalResult(" ");
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value);
+      setMedicalResult(text);
+    }
+  } catch {
+    setMedicalResult("❌ Error: Analysis failed.");
+  } finally {
+    setMedicalLoading(false);
+  }
+};
 
 const handleAudioTranscribe = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -746,6 +797,7 @@ const saveCurrentSession = () => {
           <button onClick={() => setActiveTab("data")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "data" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📊 Data Analyzer</button>
           <button onClick={() => setActiveTab("audio")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "audio" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎵 Audio Transcribe</button>
           <button onClick={() => setActiveTab("meeting")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "meeting" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📝 Meeting Notes</button>
+          <button onClick={() => setActiveTab("medical")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "medical" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>💊 Medical Analysis</button>
         </nav>
         <div className="mt-4 flex-1 overflow-y-auto">
   {sessions.length > 0 && (
@@ -780,7 +832,7 @@ const saveCurrentSession = () => {
           </div>
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : activeTab === "meeting" ? "Meeting Notes" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : activeTab === "meeting" ? "Meeting Notes" : activeTab === "medical" ? "Medical Analysis" : "Object Detection"}
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
@@ -1187,6 +1239,77 @@ const saveCurrentSession = () => {
   </div>
         
     
+        ) : activeTab === "medical" ? (
+  <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
+    <div className="w-full max-w-2xl">
+      <h2 className="text-xl font-semibold mb-2">💊 Medical Image Analysis</h2>
+      <p className="text-gray-500 text-sm mb-2">Upload X-ray, MRI, skin conditions, or medical reports</p>
+      <div className="bg-yellow-600/10 border border-yellow-600/30 rounded-xl px-4 py-3 mb-6">
+        <p className="text-xs text-yellow-400">⚠️ For educational purposes only. Always consult a qualified healthcare professional for medical advice.</p>
+      </div>
+
+      <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:border-violet-500 transition-colors bg-gray-900">
+        <div className="text-4xl mb-2">🩺</div>
+        <p className="text-gray-400 text-sm">Click to upload medical image</p>
+        <p className="text-gray-600 text-xs mt-1">X-ray, MRI, skin photos, reports</p>
+        <input type="file" accept="image/*" className="hidden" onChange={handleMedicalUpload} />
+      </label>
+
+      {medicalImage && (
+        <div className="mt-4">
+          <img src={medicalImage} alt="Medical" className="w-full max-h-64 object-contain rounded-xl border border-gray-800" />
+        </div>
+      )}
+
+      <div className="mt-4">
+        <p className="text-xs text-gray-400 mb-2">Analysis Type:</p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            "Analyze this medical image and provide detailed observations.",
+            "Describe what you see in this X-ray.",
+            "Analyze this skin condition and describe its characteristics.",
+            "Extract and summarize the information from this medical report."
+          ].map((q) => (
+            <button key={q} onClick={() => setMedicalQuery(q)} className={`px-3 py-1 rounded-lg text-xs text-left ${medicalQuery === q ? "bg-violet-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
+              {q.slice(0, 35)}...
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button
+        onClick={analyzeMedicalImage}
+        disabled={medicalLoading || !medicalImageB64}
+        className="mt-4 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed py-3 rounded-xl text-sm font-medium transition-colors"
+      >
+        {medicalLoading ? "Analyzing..." : "🩺 Analyze Medical Image"}
+      </button>
+
+      {medicalLoading && (
+        <div className="mt-4 flex items-center gap-3 text-violet-400">
+          <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm">Analyzing medical image...</span>
+        </div>
+      )}
+
+      {medicalResult && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-gray-400 mb-2">Analysis Result:</h3>
+          <div className={`rounded-xl p-4 text-sm leading-relaxed ${isDark ? "bg-gray-900 border border-gray-800 text-gray-200" : "bg-white border border-gray-200 text-gray-800"}`}>
+            <MessageContent content={medicalResult} />
+          </div>
+          <button
+            onClick={() => { setInput(medicalResult); setActiveTab("chat"); }}
+            className="mt-3 bg-violet-600 hover:bg-violet-500 px-4 py-2 rounded-lg text-sm transition-colors"
+          >
+            💬 Discuss with AI
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+
+  
     ) : activeTab === "meeting" ? (
   <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
     <div className="w-full max-w-2xl">
@@ -1247,7 +1370,7 @@ const saveCurrentSession = () => {
       )}
     </div>
   </div>
-  
+
   ) : activeTab === "search" ? (
   <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
     <div className="w-full max-w-2xl">
