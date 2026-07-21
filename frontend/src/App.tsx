@@ -180,6 +180,12 @@ function App() {
   const [cameraTarget, setCameraTarget] = useState<"ocr" | "vision" | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [sidebarSections, setSidebarSections] = useState({
+    main: true,
+    tools: true,
+    create: false,
+    analyze: false
+  });
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
   const saved = localStorage.getItem("visionsync-sessions");
     return saved ? JSON.parse(saved) : [];
@@ -842,24 +848,68 @@ const saveCurrentSession = () => {
             ✕
           </button>
         </div>
-        <nav className="flex flex-col gap-2">
-          <button onClick={() => setActiveTab("chat")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium ${activeTab === "chat" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>💬 AI Chat</button>
-          <button onClick={() => setActiveTab("pdf")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "pdf" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📑 PDF Chat</button>
-          <button onClick={() => setActiveTab("ocr")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "ocr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📷 OCR Scanner</button>
-          <button onClick={() => setActiveTab("summarizer")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "summarizer" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📄 Summarizer</button>
-          <button onClick={() => setActiveTab("translator")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "translator" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🌐 Translator</button>
-          <button onClick={() => setActiveTab("detection")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "detection" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎯 Object Detection</button>
-          <button onClick={() => setActiveTab("vision")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "vision" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🖼️ Vision Chat</button>
-          <button onClick={() => setActiveTab("search")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "search" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🔍 Web Search</button>
-          <button onClick={() => setActiveTab("qr")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "qr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📱 QR Generator</button>
-          <button onClick={() => { setActiveTab("news"); fetchNews(); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "news" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🌍 News</button>
-          <button onClick={() => setActiveTab("data")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "data" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📊 Data Analyzer</button>
-          <button onClick={() => setActiveTab("audio")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "audio" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎵 Audio Transcribe</button>
-          <button onClick={() => setActiveTab("meeting")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "meeting" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📝 Meeting Notes</button>
-          <button onClick={() => setActiveTab("medical")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "medical" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>💊 Medical Analysis</button>
-          <button onClick={() => setActiveTab("imagegen")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "imagegen" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎨 Image Generation</button>
-          <button onClick={() => setActiveTab("tts")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "tts" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🔊 Text to Speech</button>
-        </nav>
+        <nav className="flex flex-col gap-1 overflow-y-auto flex-1">
+  {/* Main */}
+  <button onClick={() => setSidebarSections(s => ({...s, main: !s.main}))} className="flex items-center justify-between px-3 py-2 text-xs text-gray-500 uppercase tracking-wider">
+    <span>Main</span>
+    <span>{sidebarSections.main ? "▲" : "▼"}</span>
+  </button>
+  {sidebarSections.main && <>
+    <button onClick={() => { setActiveTab("chat"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "chat" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>💬 AI Chat</button>
+    <button onClick={() => { setActiveTab("pdf"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "pdf" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📑 PDF Chat</button>
+    <button onClick={() => { setActiveTab("search"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "search" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🔍 Web Search</button>
+    <button onClick={() => { setActiveTab("news"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "news" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🌍 News</button>
+  </>}
+
+  {/* Vision Tools */}
+  <button onClick={() => setSidebarSections(s => ({...s, tools: !s.tools}))} className="flex items-center justify-between px-3 py-2 text-xs text-gray-500 uppercase tracking-wider mt-2">
+    <span>Vision Tools</span>
+    <span>{sidebarSections.tools ? "▲" : "▼"}</span>
+  </button>
+  {sidebarSections.tools && <>
+    <button onClick={() => { setActiveTab("ocr"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "ocr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📷 OCR Scanner</button>
+    <button onClick={() => { setActiveTab("vision"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "vision" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🖼️ Vision Chat</button>
+    <button onClick={() => { setActiveTab("detection"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "detection" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎯 Object Detection</button>
+    <button onClick={() => { setActiveTab("medical"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "medical" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>💊 Medical Analysis</button>
+  </>}
+
+  {/* Create */}
+  <button onClick={() => setSidebarSections(s => ({...s, create: !s.create}))} className="flex items-center justify-between px-3 py-2 text-xs text-gray-500 uppercase tracking-wider mt-2">
+    <span>Create</span>
+    <span>{sidebarSections.create ? "▲" : "▼"}</span>
+  </button>
+  {sidebarSections.create && <>
+    <button onClick={() => { setActiveTab("imagegen"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "imagegen" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎨 Image Generation</button>
+    <button onClick={() => { setActiveTab("tts"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "tts" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🔊 Text to Speech</button>
+    <button onClick={() => { setActiveTab("qr"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "qr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📱 QR Generator</button>
+  </>}
+
+  {/* Analyze */}
+  <button onClick={() => setSidebarSections(s => ({...s, analyze: !s.analyze}))} className="flex items-center justify-between px-3 py-2 text-xs text-gray-500 uppercase tracking-wider mt-2">
+    <span>Analyze</span>
+    <span>{sidebarSections.analyze ? "▲" : "▼"}</span>
+  </button>
+  {sidebarSections.analyze && <>
+    <button onClick={() => { setActiveTab("summarizer"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "summarizer" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📄 Summarizer</button>
+    <button onClick={() => { setActiveTab("translator"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "translator" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🌐 Translator</button>
+    <button onClick={() => { setActiveTab("data"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "data" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📊 Data Analyzer</button>
+    <button onClick={() => { setActiveTab("audio"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "audio" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎵 Audio Transcribe</button>
+    <button onClick={() => { setActiveTab("meeting"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "meeting" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📝 Meeting Notes</button>
+  </>}
+
+  {/* History */}
+  {sessions.length > 0 && (
+    <>
+      <div className="px-3 py-2 text-xs text-gray-500 uppercase tracking-wider mt-2">History</div>
+      {sessions.map((s) => (
+        <div key={s.id} className="group flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-gray-800 cursor-pointer" onClick={() => { loadSession(s); setSidebarOpen(false); }}>
+          <span className="text-xs text-gray-400 truncate flex-1">💬 {s.title}</span>
+          <button onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }} className="text-gray-600 hover:text-red-400 text-xs px-1 flex-shrink-0">✕</button>
+        </div>
+      ))}
+    </>
+  )}
+</nav>
         <div className="mt-4 flex-1 overflow-y-auto">
   {sessions.length > 0 && (
     <div>
@@ -1192,7 +1242,7 @@ const saveCurrentSession = () => {
       </div>
     </div>
   </div>
-  
+
 ) : activeTab === "data" ? (
   <div className="flex-1 flex flex-col px-6 py-6 overflow-y-auto">
     <div className="w-full max-w-3xl mx-auto">
