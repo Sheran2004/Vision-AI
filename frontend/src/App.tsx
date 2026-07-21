@@ -99,7 +99,7 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio" | "meeting" | "medical">("chat") ;
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio" | "meeting" | "medical" | "imagegen">("chat") ;
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -120,6 +120,9 @@ function App() {
   const [translateText, setTranslateText] = useState("");
   const [translateResult, setTranslateResult] = useState("");
   const [translateLoading, setTranslateLoading] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [imageGenLoading, setImageGenLoading] = useState(false);
   const [meetingText, setMeetingText] = useState("");
   const [meetingNotes, setMeetingNotes] = useState("");
   const [meetingLoading, setMeetingLoading] = useState(false);
@@ -347,6 +350,28 @@ const handleAudioTranscribe = async (e: React.ChangeEvent<HTMLInputElement>) => 
   }
 };
 
+const handleImageGeneration = async () => {
+  if (!imagePrompt.trim()) return;
+  setGeneratedImage(null);
+  setImageGenLoading(true);
+  try {
+    const res = await fetch("https://visionsync-backend.onrender.com/api/generate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: imagePrompt }),
+    });
+    const data = await res.json();
+    if (data.image) {
+      setGeneratedImage(data.image);
+    } else {
+      alert("❌ Error: " + data.error);
+    }
+  } catch {
+    alert("❌ Error: Image generation failed.");
+  } finally {
+    setImageGenLoading(false);
+  }
+};
 
 const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -798,6 +823,7 @@ const saveCurrentSession = () => {
           <button onClick={() => setActiveTab("audio")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "audio" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎵 Audio Transcribe</button>
           <button onClick={() => setActiveTab("meeting")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "meeting" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📝 Meeting Notes</button>
           <button onClick={() => setActiveTab("medical")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "medical" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>💊 Medical Analysis</button>
+          <button onClick={() => setActiveTab("imagegen")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "imagegen" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎨 Image Generation</button>
         </nav>
         <div className="mt-4 flex-1 overflow-y-auto">
   {sessions.length > 0 && (
@@ -832,7 +858,7 @@ const saveCurrentSession = () => {
           </div>
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : activeTab === "meeting" ? "Meeting Notes" : activeTab === "medical" ? "Medical Analysis" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : activeTab === "meeting" ? "Meeting Notes" : activeTab === "medical" ? "Medical Analysis" : activeTab === "imagegen" ? "Image Generation" : "Object Detection"}
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
@@ -1136,6 +1162,78 @@ const saveCurrentSession = () => {
     </div>
   </div>
 
+) : activeTab === "imagegen" ? (
+  <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
+    <div className="w-full max-w-2xl">
+      <h2 className="text-xl font-semibold mb-2">🎨 AI Image Generation</h2>
+      <p className="text-gray-500 text-sm mb-6">Generate images from text using Stable Diffusion XL</p>
+
+      <textarea
+        value={imagePrompt}
+        onChange={(e) => setImagePrompt(e.target.value)}
+        placeholder="Describe the image you want to generate..."
+        rows={4}
+        className={`w-full rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors ${isDark ? "bg-gray-900 border border-gray-800 text-white placeholder-gray-600" : "bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400"}`}
+      />
+
+      <div className="flex flex-wrap gap-2 mt-3">
+        {[
+          "A futuristic city at night with neon lights",
+          "A beautiful sunset over mountains",
+          "A robot reading a book in a library",
+          "Abstract digital art with purple colors"
+        ].map((p) => (
+          <button key={p} onClick={() => setImagePrompt(p)} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 transition-colors">
+            {p}
+          </button>
+        ))}
+      </div>
+
+      <button
+        onClick={handleImageGeneration}
+        disabled={imageGenLoading || !imagePrompt.trim()}
+        className="mt-4 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed py-3 rounded-xl text-sm font-medium transition-colors"
+      >
+        {imageGenLoading ? "Generating... (may take 30-60 seconds)" : "🎨 Generate Image"}
+      </button>
+
+      {imageGenLoading && (
+        <div className="mt-6 flex flex-col items-center gap-3 text-violet-400">
+          <div className="w-8 h-8 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm">AI is creating your image...</span>
+          <span className="text-xs text-gray-500">This may take 30-60 seconds</span>
+        </div>
+      )}
+
+      {generatedImage && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-gray-400 mb-2">Generated Image:</h3>
+          <img src={generatedImage} alt="Generated" className="w-full rounded-xl border border-gray-800" />
+          <div className="flex gap-3 mt-3">
+            
+            <button
+              onClick={() => {
+                const link = document.createElement("a");
+                link.href = generatedImage!;
+                link.download = "visionsync-generated.jpg";
+                link.click();
+              }}
+              className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              ⬇️ Download
+            </button>
+            <button
+              onClick={() => { setVisionImage(generatedImage); setVisionImageB64(generatedImage.split(",")[1]); setVisionContentType("image/jpeg"); setActiveTab("vision"); }}
+              className="bg-violet-600 hover:bg-violet-500 px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              🖼️ Analyze with Vision
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+
         ) : activeTab === "detection" ? (
           <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
             <div className="w-full max-w-2xl">
@@ -1309,7 +1407,7 @@ const saveCurrentSession = () => {
     </div>
   </div>
 
-  
+
     ) : activeTab === "meeting" ? (
   <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
     <div className="w-full max-w-2xl">
