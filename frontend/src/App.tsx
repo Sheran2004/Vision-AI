@@ -99,7 +99,7 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio">("chat") ;
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio" | "meeting">("chat") ;
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -114,6 +114,11 @@ function App() {
   const [translateText, setTranslateText] = useState("");
   const [translateResult, setTranslateResult] = useState("");
   const [translateLoading, setTranslateLoading] = useState(false);
+  const [meetingText, setMeetingText] = useState("");
+  const [meetingNotes, setMeetingNotes] = useState("");
+  const [meetingLoading, setMeetingLoading] = useState(false);
+  const [meetingAudioFile, setMeetingAudioFile] = useState<string | null>(null);
+  const [meetingAudioLoading, setMeetingAudioLoading] = useState(false);
   const [targetLanguage, setTargetLanguage] = useState("Hindi");
   const [detectResult, setDetectResult] = useState<{label: string; confidence: number}[]>([]);
   const [detectAnnotated, setDetectAnnotated] = useState<string | null>(null);
@@ -305,6 +310,65 @@ const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       setYAxis(Object.keys(results.data[0] as object)[1]);
     }
   });
+};
+
+const handleMeetingAudio = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setMeetingAudioFile(URL.createObjectURL(file));
+  setMeetingAudioLoading(true);
+  const formData = new FormData();
+  formData.append("file", file);
+  try {
+    const res = await fetch("https://visionsync-backend.onrender.com/api/transcribe", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    setMeetingText(data.text);
+  } catch {
+    setMeetingText("❌ Transcription failed.");
+  } finally {
+    setMeetingAudioLoading(false);
+  }
+};
+
+const generateMeetingNotes = async () => {
+  if (!meetingText.trim()) return;
+  setMeetingNotes("");
+  setMeetingLoading(true);
+  try {
+    const res = await fetch("https://visionsync-backend.onrender.com/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `Generate professional meeting notes from this transcript:\n\n${meetingText}`,
+        history: [],
+        system_prompt: `You are a professional meeting notes generator. From the given transcript or text, create:
+1. **Meeting Summary** - Brief overview
+2. **Key Discussion Points** - Main topics discussed
+3. **Action Items** - Tasks assigned with owners if mentioned
+4. **Decisions Made** - Important decisions
+5. **Next Steps** - Follow-up items
+
+Format everything clearly with proper headings.`
+      }),
+    });
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    setMeetingNotes(" ");
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value);
+      setMeetingNotes(text);
+    }
+  } catch {
+    setMeetingNotes("❌ Error: Failed to generate notes.");
+  } finally {
+    setMeetingLoading(false);
+  }
 };
 
 const analyzeData = async () => {
@@ -681,6 +745,7 @@ const saveCurrentSession = () => {
           <button onClick={() => { setActiveTab("news"); fetchNews(); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "news" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🌍 News</button>
           <button onClick={() => setActiveTab("data")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "data" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📊 Data Analyzer</button>
           <button onClick={() => setActiveTab("audio")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "audio" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎵 Audio Transcribe</button>
+          <button onClick={() => setActiveTab("meeting")} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "meeting" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📝 Meeting Notes</button>
         </nav>
         <div className="mt-4 flex-1 overflow-y-auto">
   {sessions.length > 0 && (
@@ -715,7 +780,7 @@ const saveCurrentSession = () => {
           </div>
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : activeTab === "meeting" ? "Meeting Notes" : "Object Detection"}
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
@@ -874,7 +939,7 @@ const saveCurrentSession = () => {
       )}
     </div>
   </div>
-  
+
         ) : activeTab === "ocr" ? (
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 gap-6 overflow-y-auto">
             <div className="w-full max-w-2xl">
@@ -1121,6 +1186,68 @@ const saveCurrentSession = () => {
     )}
   </div>
         
+    
+    ) : activeTab === "meeting" ? (
+  <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
+    <div className="w-full max-w-2xl">
+      <h2 className="text-xl font-semibold mb-2">📝 Meeting Notes Generator</h2>
+      <p className="text-gray-500 text-sm mb-6">Upload audio or paste transcript — get professional meeting notes</p>
+
+      <div className="flex gap-3 mb-4">
+        <label className="flex-1 flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl py-3 cursor-pointer text-sm text-gray-400 transition-colors">
+          🎵 Upload Audio
+          <input type="file" accept="audio/*" className="hidden" onChange={handleMeetingAudio} />
+        </label>
+      </div>
+
+      {meetingAudioLoading && (
+        <div className="flex items-center gap-3 text-violet-400 mb-4">
+          <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm">Transcribing audio...</span>
+        </div>
+      )}
+
+      <textarea
+        value={meetingText}
+        onChange={(e) => setMeetingText(e.target.value)}
+        placeholder="Paste meeting transcript or notes here... (or upload audio above)"
+        rows={8}
+        className={`w-full rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors ${isDark ? "bg-gray-900 border border-gray-800 text-white placeholder-gray-600" : "bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400"}`}
+      />
+
+      <button
+        onClick={generateMeetingNotes}
+        disabled={meetingLoading || !meetingText.trim()}
+        className="mt-4 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed py-3 rounded-xl text-sm font-medium transition-colors"
+      >
+        {meetingLoading ? "Generating..." : "📝 Generate Meeting Notes"}
+      </button>
+
+      {meetingNotes && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-gray-400 mb-2">Meeting Notes:</h3>
+          <div className={`rounded-xl p-4 text-sm leading-relaxed ${isDark ? "bg-gray-900 border border-gray-800 text-gray-200" : "bg-white border border-gray-200 text-gray-800"}`}>
+            <MessageContent content={meetingNotes} />
+          </div>
+          <div className="flex gap-3 mt-3">
+            <button
+              onClick={() => navigator.clipboard.writeText(meetingNotes)}
+              className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              📋 Copy Notes
+            </button>
+            <button
+              onClick={() => { setInput(meetingNotes); setActiveTab("chat"); }}
+              className="bg-violet-600 hover:bg-violet-500 px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              💬 Send to AI Chat
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+  
   ) : activeTab === "search" ? (
   <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
     <div className="w-full max-w-2xl">
