@@ -99,7 +99,7 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio" | "meeting" | "medical" | "imagegen" | "tts">("chat") ;
+  const [activeTab, setActiveTab] = useState<"chat" | "ocr" | "summarizer" | "translator" | "detection" | "pdf" | "vision" | "search" | "qr" | "news" | "data" | "audio" | "meeting" | "medical" | "imagegen" | "tts" | "music" | "video">("chat") ;
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string>("");
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -117,6 +117,12 @@ function App() {
   const [summaryResult, setSummaryResult] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryLength, setSummaryLength] = useState("medium");
+  const [musicPrompt, setMusicPrompt] = useState("");
+  const [generatedMusic, setGeneratedMusic] = useState<string | null>(null);
+  const [musicLoading, setMusicLoading] = useState(false);
+  const [videoPrompt, setVideoPrompt] = useState("");
+  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
   const [translateText, setTranslateText] = useState("");
   const [translateResult, setTranslateResult] = useState("");
   const [translateLoading, setTranslateLoading] = useState(false);
@@ -369,6 +375,52 @@ const handleAudioTranscribe = async (e: React.ChangeEvent<HTMLInputElement>) => 
     setAudioTranscript("❌ Error: Transcription failed.");
   } finally {
     setAudioLoading(false);
+  }
+};
+
+const handleMusicGeneration = async () => {
+  if (!musicPrompt.trim()) return;
+  setGeneratedMusic(null);
+  setMusicLoading(true);
+  try {
+    const res = await fetch("https://visionsync-backend.onrender.com/api/generate-music", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: musicPrompt, duration: 8 }),
+    });
+    const data = await res.json();
+    if (data.audio) {
+      setGeneratedMusic(data.audio);
+    } else {
+      alert("❌ " + data.error);
+    }
+  } catch {
+    alert("❌ Error: Music generation failed.");
+  } finally {
+    setMusicLoading(false);
+  }
+};
+
+const handleVideoGeneration = async () => {
+  if (!videoPrompt.trim()) return;
+  setGeneratedVideo(null);
+  setVideoLoading(true);
+  try {
+    const res = await fetch("https://visionsync-backend.onrender.com/api/generate-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: videoPrompt }),
+    });
+    const data = await res.json();
+    if (data.video) {
+      setGeneratedVideo(data.video);
+    } else {
+      alert("❌ " + data.error);
+    }
+  } catch {
+    alert("❌ Error: Video generation failed.");
+  } finally {
+    setVideoLoading(false);
   }
 };
 
@@ -882,6 +934,8 @@ const saveCurrentSession = () => {
     <button onClick={() => { setActiveTab("imagegen"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "imagegen" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎨 Image Generation</button>
     <button onClick={() => { setActiveTab("tts"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "tts" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🔊 Text to Speech</button>
     <button onClick={() => { setActiveTab("qr"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "qr" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>📱 QR Generator</button>
+    <button onClick={() => { setActiveTab("music"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "music" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎵 Music Generation</button>
+    <button onClick={() => { setActiveTab("video"); setSidebarOpen(false); }} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${activeTab === "video" ? "bg-violet-600/20 text-violet-400" : "hover:bg-gray-800 text-gray-400"}`}>🎬 Video Generation</button>
   </>}
 
   {/* Analyze */}
@@ -943,7 +997,7 @@ const saveCurrentSession = () => {
           </div>
           <div>
             <h1 className="font-semibold text-lg">
-              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : activeTab === "meeting" ? "Meeting Notes" : activeTab === "medical" ? "Medical Analysis" : activeTab === "imagegen" ? "Image Generation" : activeTab === "tts" ? "Text to Speech" : "Object Detection"}
+              {activeTab === "chat" ? "AI Chat" : activeTab === "pdf" ? "PDF Chat" : activeTab === "ocr" ? "OCR Scanner" : activeTab === "summarizer" ? "Text Summarizer" : activeTab === "translator" ? "Translator" : activeTab === "vision" ? "Vision Chat" : activeTab === "search" ? "Web Search" : activeTab === "qr" ? "QR Generator" : activeTab === "news" ? "Real-time News" : activeTab === "data" ? "Data Analyzer" : activeTab === "audio" ? "Audio Transcription" : activeTab === "meeting" ? "Meeting Notes" : activeTab === "medical" ? "Medical Analysis" : activeTab === "imagegen" ? "Image Generation" : activeTab === "tts" ? "Text to Speech" : activeTab === "music" ? "Music Generation" : activeTab === "video" ? "Video Generation" : "Object Detection"}
             </h1>
             <p className="text-xs text-gray-500">{activeTab === "detection" ? "Powered by YOLOv8" : "Powered by Llama via Groq" }</p>
           </div>
@@ -1382,6 +1436,121 @@ const saveCurrentSession = () => {
     </div>
   </div>
 
+) : activeTab === "music" ? (
+  <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
+    <div className="w-full max-w-2xl">
+      <h2 className="text-xl font-semibold mb-2">🎵 Music Generation</h2>
+      <p className="text-gray-500 text-sm mb-6">Generate music from text using Meta MusicGen</p>
+
+      <textarea
+        value={musicPrompt}
+        onChange={(e) => setMusicPrompt(e.target.value)}
+        placeholder="Describe the music you want... e.g. 'Relaxing piano melody with soft strings'"
+        rows={4}
+        className={`w-full rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors ${isDark ? "bg-gray-900 border border-gray-800 text-white placeholder-gray-600" : "bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400"}`}
+      />
+
+      <div className="flex flex-wrap gap-2 mt-3">
+        {["Relaxing piano melody", "Upbeat electronic dance music", "Acoustic guitar peaceful", "Epic orchestral music"].map((p) => (
+          <button key={p} onClick={() => setMusicPrompt(p)} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 transition-colors">{p}</button>
+        ))}
+      </div>
+
+      <button
+        onClick={handleMusicGeneration}
+        disabled={musicLoading || !musicPrompt.trim()}
+        className="mt-4 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 py-3 rounded-xl text-sm font-medium transition-colors"
+      >
+        {musicLoading ? "Generating... (may take 30-60 seconds)" : "🎵 Generate Music"}
+      </button>
+
+      {musicLoading && (
+        <div className="mt-6 flex flex-col items-center gap-3 text-violet-400">
+          <div className="w-8 h-8 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm">AI is composing music...</span>
+          <span className="text-xs text-gray-500">This may take 30-60 seconds</span>
+        </div>
+      )}
+
+      {generatedMusic && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-gray-400 mb-2">Generated Music:</h3>
+          <audio controls src={generatedMusic} className="w-full rounded-xl" />
+          <button
+            onClick={() => {
+              const link = document.createElement("a");
+              link.href = generatedMusic;
+              link.download = "visionsync-music.wav";
+              link.click();
+            }}
+            className="mt-3 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-sm transition-colors"
+          >
+            ⬇️ Download Music
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+
+) : activeTab === "video" ? (
+  <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
+    <div className="w-full max-w-2xl">
+      <h2 className="text-xl font-semibold mb-2">🎬 Video Generation</h2>
+      <p className="text-gray-500 text-sm mb-2">Generate short videos from text using Zeroscope AI</p>
+      <div className="bg-yellow-600/10 border border-yellow-600/30 rounded-xl px-4 py-3 mb-6">
+        <p className="text-xs text-yellow-400">⚠️ Free tier — may take 2-5 minutes. Short clips only.</p>
+      </div>
+
+      <textarea
+        value={videoPrompt}
+        onChange={(e) => setVideoPrompt(e.target.value)}
+        placeholder="Describe the video... e.g. 'A sunset over the ocean with waves'"
+        rows={4}
+        className={`w-full rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500 transition-colors ${isDark ? "bg-gray-900 border border-gray-800 text-white placeholder-gray-600" : "bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400"}`}
+      />
+
+      <div className="flex flex-wrap gap-2 mt-3">
+        {["A sunset over the ocean", "Flying through clouds", "A cat playing in garden", "City at night with lights"].map((p) => (
+          <button key={p} onClick={() => setVideoPrompt(p)} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 transition-colors">{p}</button>
+        ))}
+      </div>
+
+      <button
+        onClick={handleVideoGeneration}
+        disabled={videoLoading || !videoPrompt.trim()}
+        className="mt-4 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 py-3 rounded-xl text-sm font-medium transition-colors"
+      >
+        {videoLoading ? "Generating... (may take 2-5 minutes)" : "🎬 Generate Video"}
+      </button>
+
+      {videoLoading && (
+        <div className="mt-6 flex flex-col items-center gap-3 text-violet-400">
+          <div className="w-8 h-8 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm">AI is creating video...</span>
+          <span className="text-xs text-gray-500">This may take 2-5 minutes</span>
+        </div>
+      )}
+
+      {generatedVideo && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-gray-400 mb-2">Generated Video:</h3>
+          <video controls src={generatedVideo} className="w-full rounded-xl border border-gray-800" />
+          <button
+            onClick={() => {
+              const link = document.createElement("a");
+              link.href = generatedVideo;
+              link.download = "visionsync-video.mp4";
+              link.click();
+            }}
+            className="mt-3 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-sm transition-colors"
+          >
+            ⬇️ Download Video
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+  
         ) : activeTab === "detection" ? (
           <div className="flex-1 flex flex-col items-center justify-start px-6 py-8 overflow-y-auto">
             <div className="w-full max-w-2xl">
