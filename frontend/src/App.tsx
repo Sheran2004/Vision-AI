@@ -187,8 +187,8 @@ function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [sidebarSections, setSidebarSections] = useState({
-    main: true,
-    tools: true,
+    main: false,
+    tools: false,
     create: false,
     analyze: false
   });
